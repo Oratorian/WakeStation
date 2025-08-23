@@ -53,7 +53,7 @@ sudo zypper install etherwake
 ### 2. Download the script to your local machine:
 
 ```
-Goto https://github.com/Oratorian/script-archive/releases
+Goto [WakeStation/releases](https://github.com/Oratorian/WakeStation/releases)
 ```
 
 ### 3. Unpack the files.
@@ -178,3 +178,4 @@ This script is released under the GPL-3.0 license. You are free to reproduce, mo
 
 **Author**: Oration 'Mahesvara'
 **GitHub**: [Oratorian@github.com](https://github.com/Oratorian)
+
