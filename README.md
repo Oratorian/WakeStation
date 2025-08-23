@@ -9,6 +9,7 @@ This Python-based Wake-on-LAN server allows users to wake up computers in their 
 - **System Tray Integration**: Shutdown daemon runs with system tray icon, dry-run toggle, and status monitoring.
 - **User Authentication**: Secure access to the server using Flask-Login and bcrypt for password management.
 - **Web Interface**: Built-in web interface using Flask to send WOL and shutdown requests.
+- **REST API**: Direct API access with curl or other tools using session cookies for automation and scripting.
 - **Database Integration**: Stores user and device information in a local JSON-based database.
 - **GUI User Setup**: Automatic GUI dialog for initial user configuration when users.json is missing.
 - **.env File Support**: Easily configure important variables for the server and shutdown daemon.
@@ -166,6 +167,84 @@ Just run WakeStation.exe
 
 **Note**: The system tray dry-run toggle can override the `--dry-run` flag at runtime, providing convenient testing control without restarting the daemon.
 
+## API Usage with curl
+
+Once authenticated, you can use curl with saved cookies to interact with the API endpoints:
+
+### Authentication
+```bash
+# Login and save cookies to file
+curl -c cookies.txt -X POST -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  http://localhost:8889/login
+```
+
+### API Endpoints
+
+**Load PCs list:**
+```bash
+curl -b cookies.txt "http://localhost:8889/api/load"
+```
+
+**Wake a PC:**
+```bash
+curl -b cookies.txt "http://localhost:8889/api/wake?pc_name=MyPC"
+```
+
+**Add a new PC:**
+```bash
+curl -b cookies.txt -X POST -H "Content-Type: application/json" \
+  -d '{"pc_name":"TestPC","ip":"192.168.1.100","mac":"AA:BB:CC:DD:EE:FF","hostname":"testpc"}' \
+  http://localhost:8889/api/add
+```
+
+**Delete a PC:**
+```bash
+curl -b cookies.txt "http://localhost:8889/api/delete?pc_name=TestPC"
+```
+
+**Shutdown a PC:**
+```bash
+curl -b cookies.txt -X POST -H "Content-Type: application/json" \
+  -d '{"pc_name":"TestPC"}' \
+  http://localhost:8889/api/shutdown
+```
+
+**Get users list (admin only):**
+```bash
+curl -b cookies.txt "http://localhost:8889/api/users"
+```
+
+**Change user password:**
+```bash
+curl -b cookies.txt -X POST -H "Content-Type: application/json" \
+  -d '{"current_password":"oldpass","new_password":"newpass"}' \
+  http://localhost:8889/api/change_password
+```
+
+**Change user permissions (admin only):**
+```bash
+curl -b cookies.txt -X POST -H "Content-Type: application/json" \
+  -d '{"username":"user1","permission":"admin"}' \
+  http://localhost:8889/api/change_permission
+```
+
+**Delete user (admin only):**
+```bash
+curl -b cookies.txt -X POST -H "Content-Type: application/json" \
+  -d '{"username":"user1"}' \
+  http://localhost:8889/api/delete_user
+```
+
+**Sync encryption key (admin only):**
+```bash
+curl -b cookies.txt -X POST -H "Content-Type: application/json" \
+  -d '{"target_ip":"192.168.1.100","target_port":"8080"}' \
+  http://localhost:8889/api/sync_encryption_key
+```
+
+The `-c cookies.txt` flag saves cookies during login, and `-b cookies.txt` uses those saved cookies for subsequent API requests.
+
 ---
 
 ## License
@@ -176,5 +255,3 @@ This script is released under the GPL-3.0 license. You are free to reproduce, mo
 
 **Author**: Oration 'Mahesvara'
 **GitHub**: [Oratorian@github.com](https://github.com/Oratorian)
-
-
