@@ -1,0 +1,180 @@
+# Wake-on-LAN (WOL) Server - WakeStation
+
+This Python-based Wake-on-LAN server allows users to wake up computers in their local network via a web interface. It also supports remote shutdowns of network devices. The server includes user authentication for added security and can be configured using environment variables.
+
+## Features
+
+- **Wake-on-LAN Support**: Trigger WOL requests for devices in your network using their MAC addresses.
+- **Remote Shutdown Support**: Includes Python-based shutdown daemon for remote shutdown commands.
+- **System Tray Integration**: Shutdown daemon runs with system tray icon, dry-run toggle, and status monitoring.
+- **User Authentication**: Secure access to the server using Flask-Login and bcrypt for password management.
+- **Web Interface**: Built-in web interface using Flask to send WOL and shutdown requests.
+- **Database Integration**: Stores user and device information in a local JSON-based database.
+- **GUI User Setup**: Automatic GUI dialog for initial user configuration when users.json is missing.
+- **.env File Support**: Easily configure important variables for the server and shutdown daemon.
+
+## Requirements
+
+- **Python 3.11+**
+- **etherwake** (for sending WOL packets)
+
+## Installation Instructions
+
+### 1. Install etherwake
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install etherwake
+```
+
+**CentOS/RHEL/Rocky Linux/AlmaLinux:**
+```bash
+sudo yum install etherwake
+# or for newer versions:
+sudo dnf install etherwake
+```
+
+**Fedora:**
+```bash
+sudo dnf install etherwake
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S etherwake
+```
+
+**openSUSE:**
+```bash
+sudo zypper install etherwake
+```
+
+### 2. Download the script to your local machine:
+
+```
+Goto https://github.com/Oratorian/script-archive/releases
+```
+
+### 3. Unpack the files.
+
+### 4. Navigate to the unpacked directory.
+
+### 5. Set up a virtual environment (optional but recommended):
+   ```
+   python -m venv venv
+   source venv/bin/activate   # On Windows use: venv\Scripts\activate
+   ```
+
+### 6. Install the dependencies:
+
+   **For the WakeStation (main system):**
+   ```
+   pip install -r server/requirements.txt
+   ```
+
+   **For the Shutdown Daemon (target systems):**
+   ```
+   pip install -r shutdown-daemon/requirements.txt
+   ```
+
+   **For development/testing (all dependencies):**
+   ```
+   pip install -r requirements.txt
+   ```
+
+### 7. Configure the `.env` file for the `shutdown_daemon`:
+   - Create a `.env` file in the same directory as the `shutdown_daemon.py` script.
+   - Add the following lines to configure the daemon:
+     ```plaintext
+     WOL_SERVER_IP = 127.0.0.1
+     WOL_SERVER_PORT = 8889
+     BIND_IP = 127.0.0.1
+     BIND_PORT = 8080
+     SECRET_KEY=<Your secret key for HMAC authentication>
+     ```
+   - Replace `<Your WakeStation IP>`, `<Your WakeStation port>`, and `<Your secret key>` with your specific configuration.
+
+### 8. Configure sudo permissions for etherwake (if using systemd service):
+
+If you're using the `wakestation.service` systemd service file, you need to allow the `www-data` user to run `etherwake` without a password prompt. Add this line to your sudoers file:
+
+```bash
+# Edit sudoers file
+sudo visudo
+
+# Add this line (replace /usr/bin/etherwake with the actual path to etherwake):
+www-data ALL=(ALL) NOPASSWD: /usr/bin/etherwake
+
+# To find the path to etherwake, use:
+which etherwake
+```
+
+### 9. Run the WakeStation:
+   ```
+   gunicorn --bind 0.0.0.0:5000 wol_server:app
+   ```
+
+### 10. Run the `shutdown_daemon` on the target system:
+
+   **Using Python directly:**
+   ```
+   python shutdown_daemon.py
+   ```
+
+   **Using precompiled Windows binaries (if downloaded from releases):**
+   - For GUI mode: Double-click `WakeStation.exe` or run it directly
+   - For command-line mode: Use `WakeStation-CLI.exe` from command prompt
+
+   The daemon will run with a system tray icon (if GUI libraries are available) or in console mode. The system tray provides:
+   - Dry-run mode toggle (orange icon = dry-run enabled, red icon = normal mode)
+   - Last request status display (shows username and timestamp)
+   - Restart daemon and quit options
+   - Automatic GUI setup dialog if users.json is missing
+
+### 11. Access the WakeStation in your web browser at:
+   ```
+   http://localhost:8889
+   ```
+
+## Using Command-line Arguments for `shutdown_daemon`
+
+If you prefer, you can configure the `shutdown_daemon` using command-line arguments instead of a `.env` file. Use the following flags:
+- `--wol-server-ip`: Set the WakeStation IP address.
+- `--wol-server-port`: Set the WakeStation port.
+- `--secret-key`: Set the HMAC secret key.
+- `--bind-ip`: Set the IP address to bind the daemon server.
+- `--bind-port`: Set the port to bind the daemon server.
+- `--dry-run`: Enable dry-run mode for testing without executing shutdown commands.
+
+Examples:
+## Using Python
+```bash
+python shutdown_daemon.py --wol-server-ip 127.0.0.1 --wol-server-port 8889 --secret-key your_secret_key --bind-ip 0.0.0.0 --bind-port 8080 --dry-run
+```
+## Using precompiled Windows binary (command-line version)
+```bash
+WakeStation-CLI.exe --wol-server-ip 127.0.0.1 --wol-server-port 8889 --secret-key your_secret_key --bind-ip 0.0.0.0 --bind-port 8080 --dry-run
+```
+## Show help (Windows binary)
+```bash
+WakeStation-CLI.exe --help
+```
+## Using precompiled Windows binary (GUI version)
+##### For GUI mode, just run the executable (configure .env file first)
+```bash
+Just run WakeStation.exe
+```
+
+**Note**: The system tray dry-run toggle can override the `--dry-run` flag at runtime, providing convenient testing control without restarting the daemon.
+
+---
+
+## License
+
+This script is released under the GPL-3.0 license. You are free to reproduce, modify, and distribute this script as long as the original author is credited.
+
+---
+
+**Author**: Oration 'Mahesvara'
+**GitHub**: [Oratorian@github.com](https://github.com/Oratorian)

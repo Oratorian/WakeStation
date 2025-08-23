@@ -1,0 +1,13 @@
+[Unit]
+Description=Gunicorn instance to serve wol_server
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/wol
+ExecStart=/usr/local/bin/gunicorn --workers 4 --bind 0.0.0.0:8889 wakestatio:app
+ExecStop=/usr/local/bin/gunicorn --pid /run/gunicorn/pid --workers 4 --bind 0.0.0.0:8889 --graceful-timeout 30 --timeout 60 wakestation:app
+
+[Install]
+WantedBy=multi-user.target
