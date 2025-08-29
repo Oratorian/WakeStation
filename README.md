@@ -62,7 +62,7 @@ sudo zypper install etherwake
 ### 5. Set up a virtual environment (optional but recommended):
    ```
    python -m venv venv
-   source venv/bin/activate   # On Windows use: venv\Scripts\activate
+   source venv/bin/activate
    ```
 
 ### 6. Install the dependencies:
@@ -254,4 +254,5 @@ This script is released under the GPL-3.0 license. You are free to reproduce, mo
 ---
 
 **Author**: Oration 'Mahesvara'
+
 **GitHub**: [Oratorian@github.com](https://github.com/Oratorian)
