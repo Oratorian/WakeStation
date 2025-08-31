@@ -1,0 +1,87 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v2.7.0, v1.0.0, etc.
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper tagging
+    
+    - name: Get tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    
+    - name: Create release archive
+      run: |
+        # Create a clean directory for the release
+        mkdir -p release-temp
+        
+        # Copy all files except .git, .github, and other development files
+        rsync -av --exclude='.git/' \
+                  --exclude='.github/' \
+                  --exclude='__pycache__/' \
+                  --exclude='*.pyc' \
+                  --exclude='*.pyo' \
+                  --exclude='.DS_Store' \
+                  --exclude='Thumbs.db' \
+                  --exclude='*.log' \
+                  --exclude='db/' \
+                  --exclude='wol/' \
+                  ./ release-temp/
+        
+        # Create the zip file
+        cd release-temp
+        zip -r "../Wakestation-${{ steps.tag.outputs.tag }}.zip" .
+        cd ..
+        
+        # Clean up temp directory
+        rm -rf release-temp
+    
+    - name: Extract changelog for this version
+      id: changelog
+      run: |
+        if [ -f "changelog.md" ]; then
+          # Extract the changelog section for this version
+          awk '/^## 🚀 \['"${{ steps.tag.outputs.tag }}"'\]/{flag=1; print; next} /^## 🚀 \[.*\]/{flag=0} flag' changelog.md > version_changelog.md
+          
+          # If no specific version found, create a generic changelog
+          if [ ! -s version_changelog.md ]; then
+            echo "## Release ${{ steps.tag.outputs.tag }}" > version_changelog.md
+            echo "" >> version_changelog.md
+            echo "See [changelog.md](https://github.com/${{ github.repository }}/blob/main/changelog.md) for detailed changes." >> version_changelog.md
+          fi
+        else
+          echo "## Release ${{ steps.tag.outputs.tag }}" > version_changelog.md
+          echo "" >> version_changelog.md
+          echo "Release created automatically from tag ${{ steps.tag.outputs.tag }}" >> version_changelog.md
+        fi
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        name: WakeStation ${{ steps.tag.outputs.tag }}
+        body_path: version_changelog.md
+        files: |
+          Wakestation-${{ steps.tag.outputs.tag }}.zip
+        draft: false
+        prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}  # Mark as prerelease if tag contains hyphen (e.g., v2.7.0-beta)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload release artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Wakestation-${{ steps.tag.outputs.tag }}
+        path: Wakestation-${{ steps.tag.outputs.tag }}.zip
+        retention-days: 90
