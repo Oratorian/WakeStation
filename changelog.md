@@ -1,5 +1,24 @@
 # Changelog
 
+## 🚀 [v2.7.1] - 31-August-2025
+**Summary:** Automated executable builds, mobile daemon status improvements, and enhanced documentation.
+
+### 🆕 Added
+- 🏗️ Automated GitHub Actions workflow for building Windows executables on release tags
+- 📱 Mobile-friendly daemon status text indicators replacing tooltips for touch devices
+- 📝 Windows service installation documentation with NSSM instructions
+- 🔧 PyInstaller spec files for consistent executable builds with proper icons
+
+### 🔄 Changed
+- 🎯 Mobile interface now displays daemon availability status as visible text instead of tooltips
+- 📦 Release workflow now builds two executable variants: CLI and GUI versions
+- 🏷️ Executable naming convention includes version tags (e.g., shutdown_daemon-v2.7.1-x64.exe)
+
+### 🐛 Fixed
+- 📱 Mobile users can now clearly see daemon status without relying on hover tooltips
+
+---
+
 ## 🚀 [v2.7.0] - 31-August-2025
 **Summary:** Enhanced UI with device status indicators, MAC validation, persistent sessions, mobile improvements, and shutdown daemon detection.
 
@@ -94,5 +113,5 @@
 
 ---
 
-## 📜 [1.0.0 - 2.3.9] 
+## 📜 [1.0.0 - 2.3.9]
 **Summary:** No changelogs were created for these versions.

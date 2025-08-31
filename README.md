@@ -10,7 +10,7 @@ This Python-based Wake-on-LAN server allows users to wake up computers in their 
 - **User Authentication**: Secure access to the server using Flask-Login and bcrypt for password management.
 - **Web Interface**: Built-in web interface using Flask to send WOL and shutdown requests.
 - **REST API**: Direct API access with curl or other tools using session cookies for automation and scripting.
-- **Database Integration**: Stores user and device information in a local JSON-based database (Planned are either Postgres or MongoDB in future releases).
+- **Database Integration**: Stores user and device information in a local JSON-based database.
 - **GUI User Setup**: Automatic GUI dialog for initial user configuration when users.json is missing.
 - **.env File Support**: Easily configure important variables for the server and shutdown daemon.
 
@@ -62,7 +62,7 @@ sudo zypper install etherwake
 ### 5. Set up a virtual environment (optional but recommended):
    ```
    python -m venv venv
-   source venv/bin/activate
+   source venv/bin/activate   # On Windows use: venv\Scripts\activate
    ```
 
 ### 6. Install the dependencies:
@@ -122,14 +122,31 @@ which etherwake
    ```
 
    **Using precompiled Windows binaries (if downloaded from releases):**
-   - For GUI mode: Double-click `WakeStation.exe` or run it directly
-   - For command-line mode: Use `WakeStation-CLI.exe` from command prompt
+   - For GUI mode: Double-click `shutdown_daemon-v2.7.0-x64.exe` or run it directly
+   - For command-line mode: Use `shutdown_daemon-v2.7.0-x64-cli.exe` from command prompt
 
    The daemon will run with a system tray icon (if GUI libraries are available) or in console mode. The system tray provides:
    - Dry-run mode toggle (orange icon = dry-run enabled, red icon = normal mode)
    - Last request status display (shows username and timestamp)
    - Restart daemon and quit options
    - Automatic GUI setup dialog if users.json is missing
+
+   **⚠️ Important for Windows Systems:**
+   
+   For remote shutdowns to work properly on Windows systems **without auto-login configured**, the shutdown daemon must be run as a **Windows service**. This ensures the daemon remains active even when no user is logged in.
+
+   **Running as Windows Service:**
+   1. Use a service wrapper like NSSM (Non-Sucking Service Manager) or create a proper Windows service
+   2. Install NSSM: Download from https://nssm.cc/
+   3. Install the daemon as service:
+      ```cmd
+      nssm install WakeStationDaemon "C:\path\to\shutdown_daemon-v2.7.0-x64-cli.exe"
+      nssm set WakeStationDaemon Description "WakeStation Remote Shutdown Daemon"
+      nssm start WakeStationDaemon
+      ```
+   4. The service will automatically start with Windows and run in the background
+
+   **Alternative for systems with auto-login:** If your Windows system has auto-login configured, you can run the GUI version at startup via the Startup folder or Task Scheduler instead of using a service.
 
 ### 11. Access the WakeStation in your web browser at:
    ```
@@ -254,6 +271,4 @@ This script is released under the GPL-3.0 license. You are free to reproduce, mo
 ---
 
 **Author**: Oration 'Mahesvara'
-
 **GitHub**: [Oratorian@github.com](https://github.com/Oratorian)
-

@@ -158,12 +158,16 @@ function refreshDeviceStatus() {
                     
                     // Update shutdown button state based on daemon availability
                     const shutdownBtn = card.find('.pc-actions button:nth-child(2)');
+                    const daemonStatus = card.find('.daemon-status');
+                    
                     if (data.daemon_available) {
                         shutdownBtn.removeClass('btn-disabled').prop('disabled', false)
                                   .attr('title', 'Shutdown this device');
+                        daemonStatus.removeClass('unavailable').text('Shutdown daemon available');
                     } else {
                         shutdownBtn.addClass('btn-disabled').prop('disabled', true)
                                   .attr('title', 'Shutdown daemon not detected');
+                        daemonStatus.addClass('unavailable').text('Shutdown daemon not detected');
                     }
                 }
             },
@@ -215,6 +219,9 @@ function load_pcs() {
                                     <i class="material-icons-outlined">delete</i>
                                     Delete
                                 </button>
+                                <div class="daemon-status ${pc.daemon_available ? '' : 'unavailable'}">
+                                    ${pc.daemon_available ? 'Shutdown daemon available' : 'Shutdown daemon not detected'}
+                                </div>
                             </div>
                         </div>
                     `).join(''));
