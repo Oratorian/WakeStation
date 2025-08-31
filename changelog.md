@@ -1,5 +1,34 @@
 # Changelog
 
+## 🚀 [v2.7.0] - 31-August-2025
+**Summary:** Enhanced UI with device status indicators, MAC validation, persistent sessions, mobile improvements, and shutdown daemon detection.
+
+### 🆕 Added
+- 🟢 Real-time device status indicators with colored dots (green=online, red=offline, gray=unknown)
+- ⏱️ Auto-refresh device status every 30 seconds while on devices page
+- ✅ MAC address syntax validation (both frontend and backend) with helpful error messages
+- 🔒 "Remember Me" checkbox for 30-day persistent login sessions
+- 📱 Comprehensive mobile device support improvements
+- 🛡️ Shutdown daemon detection with automatic button state management
+- ❌ Visual disabled state for shutdown buttons with diagonal strikethrough when daemon unavailable
+- 🎯 Enhanced tooltips showing daemon availability status
+- 📶 Individual device status checking via `/api/status` endpoint
+
+### 🔄 Changed
+- 🔧 Moved Flask session configuration to `config.py` for consistent structure
+- 📱 Improved mobile layout for user management section with better button sizing
+- 📱 Repositioned toast messages to bottom of screen on mobile for better visibility
+- 📱 Enhanced logout button positioning and sizing for mobile devices
+- 🎨 Improved toast message contrast and readability on mobile (95% opacity background)
+
+### 🐛 Fixed
+- 📱 Fixed logout button being hidden behind page header on mobile
+- 📱 Resolved toast messages being too transparent to read on mobile
+- 📱 Fixed System Admin User Management layout issues on mobile devices
+- 🔧 Improved MAC address input field with pattern validation and helpful placeholder
+
+---
+
 ## 🚀 [v2.6.0] - 23-August-2025
 **Summary:** Enhanced shutdown daemon with system tray functionality, dry-run toggle, and GUI user initialization.
 

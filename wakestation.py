@@ -4,7 +4,7 @@
 # as the original Author
 # ---------------------------------------------------------------------------------------------
 
-## Version 2.6.0
+## Version 2.7.0
 
 
 import os
@@ -40,9 +40,14 @@ import user
 import config
 import shlex
 import htpasswd
+import socket
+import re
 
 app = Flask(__name__)
 app.secret_key = config.secret_key
+app.config['REMEMBER_COOKIE_DURATION'] = config.REMEMBER_COOKIE_DURATION
+app.config['REMEMBER_COOKIE_SECURE'] = config.REMEMBER_COOKIE_SECURE
+app.config['REMEMBER_COOKIE_HTTPONLY'] = config.REMEMBER_COOKIE_HTTPONLY
 
 if not os.path.exists(config.PC_DATA_DIR):
     os.makedirs(config.PC_DATA_DIR)
@@ -100,17 +105,19 @@ def login():
             data = request.get_json()
             username = data.get("username")
             password = data.get("password")
+            remember = data.get("remember", False)
         else:
 
             username = request.form.get("username")
             password = request.form.get("password")
+            remember = request.form.get("remember") == "on"
 
         logging.debug(f"Attempting to authenticate user: {username}")
 
         users = user.User.authenticate(username, password)
         if users:
             logging.debug(f"Authentication successful for user: {username}")
-            login_user(users)
+            login_user(users, remember=remember)
             if request.is_json:
                 return jsonify({"message": "Login successful"}), 200
             return redirect(url_for("index"))
@@ -135,6 +142,36 @@ def index():
     return render_template("index.html", user_permission=current_user.permission)
 
 
+def ping_host(ip, timeout=2):
+    """Ping a host to check if it's online"""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((ip, 80))
+        sock.close()
+        return result == 0
+    except:
+        return False
+
+
+def validate_mac_address(mac):
+    """Validate MAC address format"""
+    mac_pattern = re.compile(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$')
+    return bool(mac_pattern.match(mac))
+
+
+def check_shutdown_daemon(ip, timeout=3):
+    """Check if shutdown daemon is running on the specified IP"""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((ip, int(config.SD_DAEMON_PORT)))
+        sock.close()
+        return result == 0
+    except:
+        return False
+
+
 @app.route("/api/load", methods=["GET"])
 @login_required
 def load_pcs():
@@ -144,11 +181,37 @@ def load_pcs():
         if os.path.exists(user_pc_file):
             with open(user_pc_file, "r") as file:
                 pcs = json.load(file)
+
+            # Add status and daemon info to each PC
+            for pc in pcs:
+                pc['status'] = 'online' if ping_host(pc['ip']) else 'offline'
+                pc['daemon_available'] = check_shutdown_daemon(pc['ip'])
+
             return jsonify({"success": True, "pcs_list": pcs})
         else:
             return jsonify({"success": True, "pcs_list": []})
     except Exception as e:
         logging.error(f"Error loading PCs for user {current_user.username}: {e}")
+        return jsonify({"success": False, "message": "Internal server error"}), 500
+
+
+@app.route("/api/status", methods=["GET"])
+@login_required
+def check_pc_status():
+    ip = request.args.get("ip")
+    if not ip:
+        return jsonify({"success": False, "message": "IP address required"}), 400
+
+    try:
+        status = 'online' if ping_host(ip) else 'offline'
+        daemon_available = check_shutdown_daemon(ip)
+        return jsonify({
+            "success": True,
+            "status": status,
+            "daemon_available": daemon_available
+        })
+    except Exception as e:
+        logging.error(f"Error checking status for {ip}: {e}")
         return jsonify({"success": False, "message": "Internal server error"}), 500
 
 
@@ -176,6 +239,13 @@ def add_pc():
         if not mac or not ip or not hostname:
             return (
                 jsonify({"success": False, "message": "Missing required parameters"}),
+                400,
+            )
+
+        # Validate MAC address format
+        if not validate_mac_address(mac):
+            return (
+                jsonify({"success": False, "message": "Invalid MAC address format. Use format: AA:BB:CC:DD:EE:FF"}),
                 400,
             )
 

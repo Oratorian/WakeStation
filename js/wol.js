@@ -86,6 +86,13 @@ $(document).ready(function () {
         const mac = $('#mac').val();
         const ip = $('#ip').val();
         const hostname = $('#hostname').val();
+        
+        // Validate MAC address format
+        const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+        if (!macRegex.test(mac)) {
+            showMessage('Invalid MAC address format. Use format: AA:BB:CC:DD:EE:FF', 'error');
+            return;
+        }
         const dataToSend = JSON.stringify({
             'mac': mac,
             'ip': ip,
@@ -125,6 +132,48 @@ $(document).ready(function () {
 
 load_pcs();
 
+// Auto-refresh status every 30 seconds
+setInterval(function() {
+    if ($('#view-pcs').hasClass('active')) {
+        refreshDeviceStatus();
+    }
+}, 30000);
+
+// Function to refresh device status without reloading entire list
+function refreshDeviceStatus() {
+    $('.pc-card').each(function() {
+        const card = $(this);
+        const ip = card.find('.pc-details div:first').text().replace('IP: ', '');
+        const statusDot = card.find('.pc-status');
+        
+        $.ajax({
+            type: 'GET',
+            url: '/api/status?ip=' + ip,
+            headers: {
+                'Authorization': 'Basic ' + btoa(sessionStorage.getItem('username') + ':' + sessionStorage.getItem('passwordHash'))
+            },
+            success: function(data) {
+                if (data.success) {
+                    statusDot.removeClass('online offline unknown').addClass(data.status);
+                    
+                    // Update shutdown button state based on daemon availability
+                    const shutdownBtn = card.find('.pc-actions button:nth-child(2)');
+                    if (data.daemon_available) {
+                        shutdownBtn.removeClass('btn-disabled').prop('disabled', false)
+                                  .attr('title', 'Shutdown this device');
+                    } else {
+                        shutdownBtn.addClass('btn-disabled').prop('disabled', true)
+                                  .attr('title', 'Shutdown daemon not detected');
+                    }
+                }
+            },
+            error: function() {
+                statusDot.removeClass('online offline unknown').addClass('unknown');
+            }
+        });
+    });
+}
+
 // Load PCs function
 function load_pcs() {
     $.ajax({
@@ -143,7 +192,7 @@ function load_pcs() {
                     $('#empty-devices').hide();
                     $('#pcs-list').html(data.pcs_list.map(pc => `
                         <div class="pc-card">
-                            <div class="pc-status"></div>
+                            <div class="pc-status ${pc.status || 'unknown'}"></div>
                             <div class="pc-info">
                                 <h3 class="pc-hostname">${pc.hostname}</h3>
                                 <div class="pc-details">
@@ -156,7 +205,9 @@ function load_pcs() {
                                     <i class="material-icons-outlined">power_settings_new</i>
                                     Wake
                                 </button>
-                                <button class="btn btn-small btn-secondary" onclick="shutdown_pc('${pc.ip}')">
+                                <button class="btn btn-small btn-secondary ${pc.daemon_available ? '' : 'btn-disabled'}" 
+                                        ${pc.daemon_available ? `onclick="shutdown_pc('${pc.ip}')"` : 'disabled'} 
+                                        title="${pc.daemon_available ? 'Shutdown this device' : 'Shutdown daemon not detected'}">
                                     <i class="material-icons-outlined">power_off</i>
                                     Shutdown
                                 </button>
@@ -452,9 +503,14 @@ function showMessage(message, type = 'info') {
         ${message}
     `);
     
+    // Check if mobile view
+    const isMobile = window.innerWidth <= 768;
+    
     messageEl.css({
-        'background': `rgba(${type === 'success' ? '16, 185, 129' : type === 'error' ? '239, 68, 68' : '0, 153, 255'}, 0.1)`,
-        'color': colors[type] || colors.info,
+        'background': isMobile ? 
+            `rgba(${type === 'success' ? '16, 185, 129' : type === 'error' ? '239, 68, 68' : '0, 153, 255'}, 0.95)` :
+            `rgba(${type === 'success' ? '16, 185, 129' : type === 'error' ? '239, 68, 68' : '0, 153, 255'}, 0.1)`,
+        'color': isMobile ? '#ffffff' : colors[type] || colors.info,
         'border': `1px solid ${colors[type] || colors.info}`,
         'padding': '1rem',
         'border-radius': '8px',
