@@ -24,6 +24,7 @@
   - [🖥️ WakeStation Server Setup](#️-5-wakestation-server-setup)
   - [💻 Shutdown Daemon Setup](#-6-shutdown-daemon-setup)
 - [🔧 Command Line Usage](#-command-line-usage)
+- [🔨 Building Binaries](#-building-binaries)
 - [🌐 API Documentation](#-api-documentation)
 - [📄 License](#-license)
 
@@ -339,6 +340,107 @@ Just run WakeStation.exe
 ```
 
 **Note**: The system tray dry-run toggle can override the `--dry-run` flag at runtime, providing convenient testing control without restarting the daemon.
+
+---
+
+## 🔨 Building Binaries
+
+You can build standalone executables for both WakeStation and the shutdown daemon using PyInstaller.
+
+### 📋 Prerequisites
+
+Install PyInstaller in your virtual environment:
+```bash
+pip install pyinstaller
+```
+
+### 🏗️ Building WakeStation Server
+
+```bash
+# Navigate to project root
+cd /path/to/wakestation
+
+# Build executable
+pyinstaller --onefile --windowed --name wakestation-v2.7.1-x64 --icon=antenna.ico wakestation.py
+```
+
+### 🛑 Building Shutdown Daemon
+
+**For GUI version with system tray (recommended for desktop systems):**
+```bash
+# Navigate to shutdown daemon directory
+cd shutdown-daemon
+
+# Build GUI executable with system tray support
+pyinstaller --onefile --windowed --name shutdown_daemon-v2.7.1-x64 --icon=antenna.ico \
+    --hidden-import=bcrypt \
+    --hidden-import=cryptography \
+    --hidden-import=requests \
+    --hidden-import=python-dotenv \
+    --hidden-import=pystray \
+    --hidden-import=PIL \
+    --hidden-import=tkinter \
+    shutdown_daemon.py
+```
+
+**For CLI version (recommended for servers and Windows services):**
+```bash
+# Build CLI executable
+pyinstaller --onefile --console --name shutdown_daemon-v2.7.1-x64-cli --icon=antenna.ico \
+    --hidden-import=bcrypt \
+    --hidden-import=cryptography \
+    --hidden-import=requests \
+    --hidden-import=python-dotenv \
+    --hidden-import=pystray \
+    --hidden-import=PIL \
+    --hidden-import=tkinter \
+    shutdown_daemon.py
+```
+
+### 📁 Output Location
+
+Built executables will be located in:
+- `dist/` directory for single executables
+- The executable files will be named according to the `--name` parameter
+
+### 🐧 Linux Build Notes
+
+On Linux systems, you may need to install additional packages for GUI support:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install python3-tk python3-dev
+```
+
+**CentOS/RHEL/Fedora:**
+```bash
+sudo dnf install python3-tkinter python3-devel
+```
+
+### 🏷️ Custom Build Scripts
+
+For convenience, you can use the PyInstaller spec files included in the project:
+
+```bash
+# For shutdown daemon GUI version
+pyinstaller shutdown-daemon/shutdown_daemon_gui.spec
+
+# For shutdown daemon CLI version
+pyinstaller shutdown-daemon/shutdown_daemon_cli.spec
+```
+
+These spec files include all necessary hidden imports and configurations.
+
+### ⚠️ Build Troubleshooting
+
+**Missing modules error:**
+If you encounter "ModuleNotFoundError" when running the executable, add the missing module to the `--hidden-import` list or update the spec file.
+
+**Icon not found:**
+Ensure `antenna.ico` is present in the appropriate directory before building.
+
+**Large executable size:**
+PyInstaller includes all dependencies. To reduce size, consider using `--exclude-module` for unnecessary packages, but test thoroughly.
 
 ---
 
