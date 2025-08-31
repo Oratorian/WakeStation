@@ -6,7 +6,62 @@ on:
       - 'v*'  # Triggers on version tags like v2.7.0, v1.0.0, etc.
 
 jobs:
+  build-executables:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper tagging
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r shutdown-daemon/requirements.txt
+        pip install pyinstaller
+    
+    - name: Get tag name
+      id: tag
+      shell: pwsh
+      run: |
+        $tag = "${env:GITHUB_REF}" -replace 'refs/tags/', ''
+        echo "tag=$tag" >> $env:GITHUB_OUTPUT
+    
+    - name: Build shutdown daemon executables
+      run: |
+        # Change to shutdown-daemon directory
+        cd shutdown-daemon
+        
+        # Build CLI version (console mode)
+        pyinstaller shutdown_daemon_cli.spec
+        Rename-Item -Path "dist/shutdown_daemon-cli.exe" -NewName "shutdown_daemon-${{ steps.tag.outputs.tag }}-x64-cli.exe"
+        
+        # Build GUI version (windowed mode with system tray)
+        pyinstaller shutdown_daemon_gui.spec
+        Rename-Item -Path "dist/shutdown_daemon.exe" -NewName "shutdown_daemon-${{ steps.tag.outputs.tag }}-x64.exe"
+        
+        # List built files for verification
+        Get-ChildItem -Path dist/
+    
+    - name: Upload executables as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: shutdown-daemon-executables
+        path: |
+          shutdown-daemon/dist/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64-cli.exe
+          shutdown-daemon/dist/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64.exe
+        retention-days: 90
+
   release:
+    needs: build-executables
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,6 +71,12 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Fetch all history for proper tagging
+    
+    - name: Download executables
+      uses: actions/download-artifact@v4
+      with:
+        name: shutdown-daemon-executables
+        path: ./executables
     
     - name: Get tag name
       id: tag
@@ -74,6 +135,8 @@ jobs:
         body_path: version_changelog.md
         files: |
           Wakestation-${{ steps.tag.outputs.tag }}.zip
+          executables/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64-cli.exe
+          executables/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64.exe
         draft: false
         prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}  # Mark as prerelease if tag contains hyphen (e.g., v2.7.0-beta)
       env:
