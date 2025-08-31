@@ -10,7 +10,7 @@ This Python-based Wake-on-LAN server allows users to wake up computers in their 
 - **User Authentication**: Secure access to the server using Flask-Login and bcrypt for password management.
 - **Web Interface**: Built-in web interface using Flask to send WOL and shutdown requests.
 - **REST API**: Direct API access with curl or other tools using session cookies for automation and scripting.
-- **Database Integration**: Stores user and device information in a local JSON-based database.
+- **Database Integration**: Stores user and device information in a local JSON-based database (Planned are either Postgres or MongoDB in future releases).
 - **GUI User Setup**: Automatic GUI dialog for initial user configuration when users.json is missing.
 - **.env File Support**: Easily configure important variables for the server and shutdown daemon.
 
@@ -256,3 +256,4 @@ This script is released under the GPL-3.0 license. You are free to reproduce, mo
 **Author**: Oration 'Mahesvara'
 
 **GitHub**: [Oratorian@github.com](https://github.com/Oratorian)
+
