@@ -80,7 +80,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Upload release artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Wakestation-${{ steps.tag.outputs.tag }}
         path: Wakestation-${{ steps.tag.outputs.tag }}.zip
