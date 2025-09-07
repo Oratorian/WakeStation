@@ -1,0 +1,27 @@
+# Core Flask application dependencies
+Flask==3.0.3
+Flask-Login==0.6.3
+werkzeug==3.0.4
+gunicorn==23.0.0
+
+# Security and authentication
+bcrypt==4.2.0
+cryptography==43.0.1
+
+# HTTP client and utilities
+requests>=2.32.3
+python-dotenv>=1.0.1
+psutil>=6.0.0
+
+# GUI dependencies (for shutdown daemon system tray)
+pystray>=0.19.5
+pillow>=10.4.0
+
+# Optional: Enhanced CLI argument parsing (already in Python stdlib as argparse)
+# argparse - built-in module
+
+# Optional: Enhanced JSON handling (already in Python stdlib)
+# json - built-in module
+
+# Requirements for packaging and distribution
+pyinstaller

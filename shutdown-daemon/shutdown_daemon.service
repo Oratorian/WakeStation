@@ -1,0 +1,30 @@
+[Unit]
+Description=WakeStation Shutdown Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+Group=nobody
+WorkingDirectory=/opt/wakestation/shutdown-daemon
+ExecStart=/opt/wakestation/shutdown-daemon-venv/bin/python shutdown_daemon.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/wakestation/shutdown-daemon
+
+# Environment variables (optional - can also use .env file)
+#Environment=BIND_IP=0.0.0.0
+#Environment=BIND_PORT=8080
+#Environment=WOL_SERVER_IP=192.168.1.100
+#Environment=WOL_SERVER_PORT=8889
+
+[Install]
+WantedBy=multi-user.target

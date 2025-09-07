@@ -1,0 +1,220 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v2.7.0, v1.0.0, etc.
+
+jobs:
+  build-executables:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper tagging
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Get tag name and parse version
+      id: tag
+      shell: pwsh
+      run: |
+        $tag = "${env:GITHUB_REF}" -replace 'refs/tags/', ''
+        echo "tag=$tag" >> $env:GITHUB_OUTPUT
+
+        # Parse version from tag (e.g., v2.7.1 -> 2.7.1)
+        $version = $tag -replace '^v', ''
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+
+        # Split version into components for environment variables
+        $versionParts = $version.Split('.')
+        if ($versionParts.Length -ge 3) {
+          $major = $versionParts[0]
+          $minor = $versionParts[1]
+          $patch = $versionParts[2]
+          $build = if ($versionParts.Length -ge 4) { $versionParts[3] } else { "0" }
+        } else {
+          # Fallback for malformed version tags
+          $major = "2"
+          $minor = "7"
+          $patch = "1"
+          $build = "0"
+        }
+
+        echo "version_major=$major" >> $env:GITHUB_OUTPUT
+        echo "version_minor=$minor" >> $env:GITHUB_OUTPUT
+        echo "version_patch=$patch" >> $env:GITHUB_OUTPUT
+        echo "version_build=$build" >> $env:GITHUB_OUTPUT
+
+    - name: Generate version info files
+      shell: pwsh
+      run: |
+        # Set environment variables for version generation
+        $env:VERSION_MAJOR = "${{ steps.tag.outputs.version_major }}"
+        $env:VERSION_MINOR = "${{ steps.tag.outputs.version_minor }}"
+        $env:VERSION_PATCH = "${{ steps.tag.outputs.version_patch }}"
+        $env:VERSION_BUILD = "${{ steps.tag.outputs.version_build }}"
+
+        # Generate version info files using the existing system
+        python src/helper/gen_version.py shutdown-daemon --type both
+
+        # List generated files
+        Get-ChildItem -Path shutdown-daemon/ -Filter "version_info*.txt"
+
+    - name: Build shutdown daemon executables
+      shell: pwsh
+      run: |
+        # Change to shutdown-daemon directory
+        cd shutdown-daemon
+
+        # Set environment variables for consistent versioning
+        $env:VERSION_MAJOR = "${{ steps.tag.outputs.version_major }}"
+        $env:VERSION_MINOR = "${{ steps.tag.outputs.version_minor }}"
+        $env:VERSION_PATCH = "${{ steps.tag.outputs.version_patch }}"
+        $env:VERSION_BUILD = "${{ steps.tag.outputs.version_build }}"
+
+        # Build CLI version (console mode) with generated version info
+        pyinstaller --onefile --console --name "shutdown_daemon-cli" --icon=shutdown_daemon_icon.ico --version-file "version_info_cli.txt" --hidden-import=bcrypt --hidden-import=cryptography --hidden-import=requests --hidden-import=dotenv --hidden-import=pystray --hidden-import=PIL --hidden-import=tkinter --distpath dist/ shutdown_daemon.py
+        Rename-Item -Path "dist/shutdown_daemon-cli.exe" -NewName "shutdown_daemon-${{ steps.tag.outputs.tag }}-x64-cli.exe"
+
+        # Build GUI version (windowed mode with system tray) with generated version info
+        pyinstaller --onefile --windowed --name "shutdown_daemon" --icon=shutdown_daemon_icon.ico --version-file "version_info.txt" --hidden-import=bcrypt --hidden-import=cryptography --hidden-import=requests --hidden-import=dotenv --hidden-import=pystray --hidden-import=PIL --hidden-import=tkinter --distpath dist/ shutdown_daemon.py
+        Rename-Item -Path "dist/shutdown_daemon.exe" -NewName "shutdown_daemon-${{ steps.tag.outputs.tag }}-x64.exe"
+
+        # List built files for verification
+        Get-ChildItem -Path dist/
+
+    - name: Upload executables as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: shutdown-daemon-executables
+        path: |
+          shutdown-daemon/dist/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64-cli.exe
+          shutdown-daemon/dist/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64.exe
+        retention-days: 90
+
+  release:
+    needs: build-executables
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper tagging
+
+    - name: Download executables
+      uses: actions/download-artifact@v4
+      with:
+        name: shutdown-daemon-executables
+        path: ./executables
+
+    - name: Get tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Create release archive
+      run: |
+        # Create a clean directory for the release
+        mkdir -p release-temp
+
+        # Copy essential files for production deployment
+        cp -r templates/ release-temp/ 2>/dev/null || true
+        cp -r static/ release-temp/ 2>/dev/null || true
+        cp -r src/ release-temp/
+        cp -r shutdown-daemon/ release-temp/
+        cp wakestation.py release-temp/
+        cp config.py release-temp/
+        cp requirements.txt release-temp/
+        cp README.md release-temp/
+        cp changelog.md release-temp/
+        cp LICENSE* release-temp/ 2>/dev/null || true
+        cp build_cli.bat release-temp/ 2>/dev/null || true
+        cp build_gui.bat release-temp/ 2>/dev/null || true
+        
+        # Copy Windows compatibility tools (essential for Windows functionality)
+        cp arp-scan.exe release-temp/ 2>/dev/null || echo "Warning: arp-scan.exe not found"
+        cp nc.exe release-temp/ 2>/dev/null || echo "Warning: nc.exe not found"
+        cp libcrypto-3.dll release-temp/ 2>/dev/null || echo "Warning: libcrypto-3.dll not found"
+        cp libssl-3.dll release-temp/ 2>/dev/null || echo "Warning: libssl-3.dll not found"
+        
+        # Verify Windows tools were copied
+        ls -la release-temp/*.exe release-temp/*.dll 2>/dev/null || echo "No Windows tools found in release-temp"
+
+        # Remove development and build artifacts from src
+        find release-temp/ -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+        find release-temp/ -name "*.pyc" -delete 2>/dev/null || true
+        find release-temp/ -name "*.pyo" -delete 2>/dev/null || true
+        find release-temp/ -name ".DS_Store" -delete 2>/dev/null || true
+        find release-temp/ -name "Thumbs.db" -delete 2>/dev/null || true
+        find release-temp/ -name "*.log" -delete 2>/dev/null || true
+
+        # Remove build artifacts from shutdown-daemon
+        rm -rf release-temp/shutdown-daemon/build/ 2>/dev/null || true
+        rm -rf release-temp/shutdown-daemon/dist/ 2>/dev/null || true
+        rm -rf release-temp/shutdown-daemon/.venv/ 2>/dev/null || true
+        rm -f release-temp/shutdown-daemon/version_info*.txt 2>/dev/null || true
+
+        # Create the zip file
+        cd release-temp
+        zip -r "../Wakestation-${{ steps.tag.outputs.tag }}.zip" .
+        cd ..
+
+        # Clean up temp directory
+        rm -rf release-temp
+
+    - name: Extract changelog for this version
+      id: changelog
+      run: |
+        if [ -f "changelog.md" ]; then
+          # Extract the changelog section for this version
+          awk '/^## 🚀 \['"${{ steps.tag.outputs.tag }}"'\]/{flag=1; print; next} /^## 🚀 \[.*\]/{flag=0} flag' changelog.md > version_changelog.md
+
+          # If no specific version found, create a generic changelog
+          if [ ! -s version_changelog.md ]; then
+            echo "## Release ${{ steps.tag.outputs.tag }}" > version_changelog.md
+            echo "" >> version_changelog.md
+            echo "See [changelog.md](https://github.com/${{ github.repository }}/blob/main/changelog.md) for detailed changes." >> version_changelog.md
+          fi
+        else
+          echo "## Release ${{ steps.tag.outputs.tag }}" > version_changelog.md
+          echo "" >> version_changelog.md
+          echo "Release created automatically from tag ${{ steps.tag.outputs.tag }}" >> version_changelog.md
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        name: WakeStation ${{ steps.tag.outputs.tag }}
+        body_path: version_changelog.md
+        files: |
+          Wakestation-${{ steps.tag.outputs.tag }}.zip
+          executables/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64-cli.exe
+          executables/shutdown_daemon-${{ steps.tag.outputs.tag }}-x64.exe
+        draft: false
+        prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}  # Mark as prerelease if tag contains hyphen (e.g., v2.7.0-beta)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload release artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Wakestation-${{ steps.tag.outputs.tag }}
+        path: Wakestation-${{ steps.tag.outputs.tag }}.zip
+        retention-days: 90
