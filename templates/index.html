@@ -492,7 +492,7 @@
             width: 90%;
             max-height: 80vh;
             overflow: hidden;
-            position: relative;
+            position: fixed;
             animation: modalSlideIn 0.3s ease-out;
         }
 
@@ -530,6 +530,7 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            flex-shrink: 0;
         }
 
         .modal-footer {
@@ -539,6 +540,7 @@
             justify-content: flex-end;
             gap: 1rem;
             border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
         }
 
         .status-indicator {
@@ -718,6 +720,538 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Chat Modal Styles */
+        .chat-modal {
+            max-width: calc(100vw - 40px);
+            max-height: calc(100vh - 40px);
+            min-width: 400px;
+            min-height: 300px;
+            width: 600px;
+            height: 70vh;
+            display: flex;
+            flex-direction: column;
+            resize: both;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .chat-modal.resizable {
+            resize: none; /* Disable default resize, use custom handles */
+        }
+
+        .chat-modal .modal-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            margin: 0 -2rem;
+            min-height: 200px;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chat-message {
+            margin-bottom: 1rem;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .chat-message.user {
+            text-align: right;
+        }
+
+        .chat-message.assistant {
+            text-align: left;
+        }
+
+        .chat-bubble {
+            display: inline-block;
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .chat-bubble.user {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--bg-primary);
+            font-weight: 500;
+        }
+
+        .chat-bubble.assistant {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .chat-bubble.system {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            font-style: italic;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-shrink: 0;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            resize: none;
+            min-height: 40px;
+            max-height: 100px;
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .chat-send-btn {
+            padding: 0.75rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .chat-loading {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            flex-shrink: 0;
+        }
+
+        .chat-loading .loading-dots {
+            display: inline-block;
+        }
+
+        .chat-loading .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        .action-notification {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .action-notification.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+
+        /* Code boxes with copy button */
+        .code-box {
+            position: relative;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 0.5rem 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .code-box-header {
+            background: rgba(0, 255, 136, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .code-box-content {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            background: rgba(0, 0, 0, 0.3);
+            word-break: break-all;
+            user-select: all;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .copy-btn.copied {
+            background: var(--success);
+            color: white;
+            border-color: var(--success);
+        }
+
+        /* Resize handles */
+        .resize-handle {
+            position: absolute;
+            background: var(--accent-primary);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 1001;
+        }
+
+        .chat-modal:hover .resize-handle {
+            opacity: 0.3;
+        }
+
+        .resize-handle:hover {
+            opacity: 0.8 !important;
+        }
+
+        .resize-handle.resize-right {
+            top: 0;
+            right: -3px;
+            width: 6px;
+            height: 100%;
+            cursor: ew-resize;
+        }
+
+        .resize-handle.resize-bottom {
+            bottom: -3px;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            cursor: ns-resize;
+        }
+
+        .resize-handle.resize-corner {
+            bottom: -3px;
+            right: -3px;
+            width: 20px;
+            height: 20px;
+            cursor: nw-resize;
+            background: linear-gradient(-45deg, transparent 30%, var(--accent-primary) 30%, var(--accent-primary) 70%, transparent 70%);
+        }
+
+        .resize-handle.resize-corner::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            background-image: 
+                linear-gradient(45deg, var(--accent-primary) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, var(--accent-primary) 75%);
+            background-size: 3px 3px;
+            background-position: 0 0, 3px 3px;
+        }
+
+        /* Draggable modal header */
+        .modal-title.draggable {
+            cursor: move;
+            user-select: none;
+            padding: 0.5rem 0;
+        }
+
+        .modal-title.draggable:hover {
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 8px;
+            margin: -0.5rem 0;
+            padding: 0.5rem;
+        }
+
+        /* Prevent text selection during drag */
+        .chat-modal.dragging {
+            user-select: none;
+        }
+
+        .chat-modal.dragging * {
+            pointer-events: none;
+        }
+
+        .chat-modal.dragging .modal-title {
+            pointer-events: auto;
+        }
+
+        /* Floating Chat Button */
+        .chat-fab {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--bg-primary);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
+            transition: all 0.3s ease;
+            z-index: 999;
+            animation: fabPulse 3s infinite;
+        }
+
+        .chat-fab:hover {
+            transform: translateY(-3px) scale(1.1);
+            box-shadow: 0 12px 35px rgba(0, 255, 136, 0.6);
+        }
+
+        .chat-fab:active {
+            transform: translateY(-1px) scale(1.05);
+        }
+
+        @keyframes fabPulse {
+            0%, 100% { 
+                box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
+            }
+            50% { 
+                box-shadow: 0 8px 25px rgba(0, 255, 136, 0.6), 0 0 30px rgba(0, 255, 136, 0.3);
+            }
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .chat-fab {
+                bottom: 1rem;
+                right: 1rem;
+                width: 56px;
+                height: 56px;
+                font-size: 1.3rem;
+            }
+        }
+
+        /* Cookie Consent Banner */
+        .cookie-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-secondary);
+            border-top: 2px solid var(--accent-primary);
+            padding: 1rem 2rem;
+            z-index: 10000;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+            transform: translateY(100%);
+            transition: transform 0.4s ease-out;
+            backdrop-filter: blur(10px);
+        }
+
+        .cookie-banner.show {
+            transform: translateY(0);
+        }
+
+        .cookie-banner-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .cookie-banner-text {
+            flex: 1;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .cookie-banner-text a {
+            color: var(--accent-primary);
+            text-decoration: none;
+        }
+
+        .cookie-banner-text a:hover {
+            text-decoration: underline;
+        }
+
+        .cookie-banner-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .cookie-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .cookie-btn.accept {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--bg-primary);
+            border: none;
+        }
+
+        .cookie-btn.accept:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
+        }
+
+        .cookie-btn.decline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .cookie-btn.decline:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        @media (max-width: 768px) {
+            .cookie-banner {
+                padding: 1rem;
+            }
+            
+            .cookie-banner-content {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            
+            .cookie-banner-actions {
+                justify-content: center;
+                margin-top: 0.5rem;
+            }
+            
+            .cookie-btn {
+                flex: 1;
+                max-width: 120px;
+            }
+        }
+
+        /* Custom Scrollbars */
+        /* Webkit browsers (Chrome, Safari, Edge) */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 4px;
+            box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:active {
+            background: var(--accent-primary);
+        }
+
+        .chat-messages::-webkit-scrollbar-corner {
+            background: var(--bg-tertiary);
+        }
+
+        /* Firefox */
+        .chat-messages {
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) var(--bg-tertiary);
+        }
+
+        /* General scrollbars for other elements */
+        *::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 136, 0.6);
+            border-radius: 4px;
+            transition: background 0.2s ease;
+        }
+
+        *::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 136, 0.8);
+        }
+
+        *::-webkit-scrollbar-corner {
+            background: var(--bg-secondary);
+        }
+
+        /* Specific styling for the main container scrollbars */
+        .container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.4), rgba(0, 153, 255, 0.4));
+        }
+
+        .container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.6), rgba(0, 153, 255, 0.6));
+        }
     </style>
 </head>
 <body>
@@ -858,7 +1392,87 @@
         </div>
     </div>
 
+    <div id="chatModal" class="modal-backdrop" style="display: none;">
+        <div class="modal chat-modal resizable" id="chatModalWindow">
+            <!-- Resize Handles -->
+            <div class="resize-handle resize-right"></div>
+            <div class="resize-handle resize-bottom"></div>
+            <div class="resize-handle resize-corner"></div>
+            
+            <div class="modal-content">
+                <h3 class="modal-title draggable" id="chatModalTitle">
+                    <i class="material-icons-outlined">smart_toy</i>
+                    AI Assistant
+                    <span style="font-size: 0.7rem; opacity: 0.7; margin-left: auto;">Drag to move • Hover corners to resize</span>
+                </h3>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-message assistant">
+                        <div class="chat-bubble assistant">
+                            🖥️ Hi! I'm your device management assistant. I understand natural language, so just talk to me normally!
+                            <br><br>
+                            Try asking me things like:
+                            <br>
+                            • "Wake up my pc" or "Can you start andrew-pc?"
+                            <br>
+                            • "What's my laptop doing?" or "Is andrew-pc online?"  
+                            <br>
+                            • "Show me the IP of my server" or "Tell me about my devices"
+                            <br>
+                            • "How are my computers doing?" or "What devices do I have?"
+                            <br><br>
+                            <strong>I understand context and natural speech - no need for exact commands!</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-loading" id="chat-loading">
+                    AI is thinking<span class="loading-dots"></span>
+                </div>
+                <div class="chat-input-container">
+                    <textarea id="chat-input" class="chat-input" placeholder="Type your command here... (e.g., 'wake andrew-pc')" rows="1"></textarea>
+                    <button id="chat-send" class="btn chat-send-btn">
+                        <i class="material-icons-outlined">send</i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">
+                    <i class="material-icons-outlined">close</i>
+                    Close
+                </button>
+                <button id="chat-clear" class="btn btn-secondary">
+                    <i class="material-icons-outlined">clear_all</i>
+                    Clear Chat
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="message" class="status-indicator" style="position: fixed; top: 1rem; right: 1rem; display: none; z-index: 9999;"></div>
+
+    <!-- Floating AI Chat Button -->
+    <button class="chat-fab" id="chat-button" title="AI Assistant - Talk to control your devices">
+        <i class="material-icons-outlined">smart_toy</i>
+    </button>
+
+    <!-- Cookie Consent Banner -->
+    <div class="cookie-banner" id="cookieBanner">
+        <div class="cookie-banner-content">
+            <div class="cookie-banner-text">
+                <strong>🍪 WakeStation uses cookies</strong> to save your chat window preferences and improve your experience. 
+                We only store essential settings locally - no tracking or analytics.
+            </div>
+            <div class="cookie-banner-actions">
+                <button class="cookie-btn decline" id="cookieDecline">
+                    <i class="material-icons-outlined" style="font-size: 0.8rem;">close</i>
+                    Decline
+                </button>
+                <button class="cookie-btn accept" id="cookieAccept">
+                    <i class="material-icons-outlined" style="font-size: 0.8rem;">check</i>
+                    Accept
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
     <script type="text/javascript" src="/js/wol.js?v=6"></script>

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """!
 ********************************************************************************
-@file   config.py
 @brief  Configuration settings for WakeStation application
+
+@file   config.py
 @author Mahesvara ( https://github.com/Oratorian )
 @copyright Mahesvara ( https://github.com/Oratorian )
 ********************************************************************************
@@ -16,7 +17,7 @@ import os
 
 # Flask Application Configuration
 SECRET_KEY = "your_secret_key_here"  # Change this to a secure random key in production
-DEBUG = False  # Enable debug mode (NEVER in production)
+DEBUG = True  # Enable debug mode (NEVER in production)
 
 # =============================================================================
 # DIRECTORY AND FILE PATHS
@@ -29,6 +30,7 @@ TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")  # Template files directory
 
 # Data files
 USERS_FILE = os.path.join(DB_DIR, "users.json")  # User authentication data
+DAEMON_DATA_FILE = os.path.join(DB_DIR, "daemon_registry.json")  # Daemon configurations
 PC_DATA_DIR = os.path.join(DB_DIR, "pcs")  # User PC configurations
 ENCRYPTION_KEY_FILE = os.path.join(DB_DIR, "enc.bin")  # Encryption key file
 
@@ -36,11 +38,25 @@ ENCRYPTION_KEY_FILE = os.path.join(DB_DIR, "enc.bin")  # Encryption key file
 # NETWORK CONFIGURATION
 # =============================================================================
 
-# Wake-on-LAN Settings
-WOL_INTERFACE = "10.0.1.13"  # Network interface WakeStation binds to (NOT 0.0.0.0 or 127.0.0.1 or localhost)
-# To find your active network interface, run:
-# Linux: sudo lshw -C network | awk '/logical name:/ {name=$3} /ip=/ {ip=$2} /link=yes/ {print name, ip}'
-# Windows: ipconfig /all
+# Network Configuration
+
+# WOL Interface - MUST be a specific network interface IP that belongs to this machine
+# CANNOT be 0.0.0.0, 127.0.0.1, or localhost - must be actual network interface
+WOL_INTERFACE = "10.0.1.13"  # Change this to your server's actual IP address
+# To find your interface IP:
+# Linux: ip addr show | grep 'inet ' | grep -v 127.0.0.1
+# Windows: ipconfig | findstr IPv4
+# macOS: ifconfig | grep 'inet ' | grep -v 127.0.0.1
+
+# Server Binding - Separate configuration for Flask development server
+FLASK_HOST = os.environ.get(
+    "FLASK_HOST", "0.0.0.0"
+)  # Development server binding (can be 0.0.0.0)
+FLASK_PORT = int(os.environ.get("FLASK_PORT", "8888"))  # Development server port
+
+# Production deployment notes:
+# - Gunicorn ignores FLASK_HOST/FLASK_PORT: use --bind 0.0.0.0:8888
+# - WOL_INTERFACE is ALWAYS needed for Wake-on-LAN functionality
 
 # Shutdown Daemon Settings
 SHUTDOWN_DAEMON_PORT = 8080  # Port for shutdown daemon communication
