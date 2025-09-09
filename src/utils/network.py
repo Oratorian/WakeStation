@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """!
 ********************************************************************************
-@file   network.py
 @brief  Network utility functions for WakeStation - ping, MAC validation, daemon checks
+
+@file   network.py
 @author Mahesvara ( https://github.com/Oratorian )
 @copyright Mahesvara ( https://github.com/Oratorian )
 ********************************************************************************

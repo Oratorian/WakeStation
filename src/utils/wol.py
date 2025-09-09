@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """!
 ********************************************************************************
-@file   wol.py
 @brief  Wake-on-LAN utilities using Python sockets (cross-platform)
+
+@file   wol.py
 @author Mahesvara ( https://github.com/Oratorian )
 @copyright Mahesvara ( https://github.com/Oratorian )
 ********************************************************************************

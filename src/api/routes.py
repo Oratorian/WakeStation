@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """!
 ********************************************************************************
-@file   routes.py
 @brief  Flask API routes and web endpoints for WakeStation
+
+@file   routes.py
 @author Mahesvara ( https://github.com/Oratorian )
 @copyright Mahesvara ( https://github.com/Oratorian )
 ********************************************************************************
@@ -27,14 +28,64 @@ from ..logger import logger
 
 
 def setup_routes(app):
-    """Setup all API routes for the Flask app"""
+    """!
+    @brief Setup all API routes and internal helper functions for the Flask application.
+
+    Main route registration function that defines all web endpoints, API routes,
+    and internal helper functions for the WakeStation server. This includes:
+    - Authentication routes (login/logout)
+    - PC management API (add, delete, wake, shutdown)
+    - User management endpoints
+    - Daemon registration and synchronization
+    - Status checking and monitoring
+
+    The function encapsulates all route handlers and helper functions within
+    its scope to maintain proper Flask app context and logging configuration.
+
+    @param app Flask application instance to register routes with
+
+    @note All route handlers are defined as nested functions within this scope
+    @note Daemon registry functionality is included for shutdown daemon integration
+    @note Logging is initialized once and shared across all route handlers
+    @note Routes support both web interface and API clients with appropriate responses
+
+    @warning Routes must be registered after Flask-Login is properly configured
+
+    @throws Exception Various Flask and database errors during route registration
+    """
     log = logger.get_logger("routes")
 
     # Daemon registry file path
-    DAEMON_REGISTRY_FILE = os.path.join("db", "daemon_registry.json")
+    DAEMON_REGISTRY_FILE = config.DAEMON_DATA_FILE
 
     def register_daemon(daemon_ip: str, daemon_port: int, daemon_mac: str = None):
-        """Register a daemon's IP, port, and MAC address for later use."""
+        """!
+        @brief Register a shutdown daemon's connection details for future remote shutdown operations.
+
+        Maintains a persistent registry of active shutdown daemons that can be used
+        for remote shutdown operations. Each daemon entry includes network details
+        and timestamps for tracking availability.
+
+        Registry entry includes:
+        - IP address and port for daemon communication
+        - MAC address for network identification (if available)
+        - Last seen timestamp for staleness detection
+
+        @param daemon_ip IP address where the shutdown daemon is listening
+        @param daemon_port Port number the daemon is bound to (typically 8080)
+        @param daemon_mac MAC address of the daemon's network interface (optional)
+
+        @note Creates db directory if it doesn't exist
+        @note Uses IP address as unique key (one daemon per IP assumption)
+        @note Overwrites existing entries for the same IP address
+        @note Registry is persisted to daemon_registry.json for server restarts
+
+        @warning No validation of daemon connectivity - registration is declarative
+
+        @throws json.JSONDecodeError If existing registry file is corrupted
+        @throws IOError If registry file cannot be written
+        @throws Exception Various file system and serialization errors
+        """
         try:
             # Ensure the db directory exists
             os.makedirs("db", exist_ok=True)
@@ -68,7 +119,25 @@ def setup_routes(app):
             log.error(f"Error registering daemon {daemon_ip}:{daemon_port}: {e}")
 
     def get_daemon_by_ip(daemon_ip: str) -> dict:
-        """Get daemon information by IP address."""
+        """!
+        @brief Retrieve registered daemon information by IP address.
+
+        Looks up daemon details from the persistent registry to enable
+        remote shutdown operations. Used when the system needs to contact
+        a specific daemon for shutdown requests.
+
+        @param daemon_ip IP address of the daemon to look up
+        @return Dictionary containing daemon details (ip, port, mac, last_seen) or empty dict
+        @retval dict Daemon information if found, empty dictionary if not found
+
+        @note Returns empty dict if registry file doesn't exist
+        @note Returns empty dict if daemon IP is not registered
+        @note Logs errors but returns empty dict for graceful degradation
+        @note No staleness checking - returns data regardless of last_seen timestamp
+
+        @throws json.JSONDecodeError If registry file is corrupted (logged, returns empty dict)
+        @throws IOError If registry file cannot be read (logged, returns empty dict)
+        """
         try:
             if os.path.exists(DAEMON_REGISTRY_FILE):
                 with open(DAEMON_REGISTRY_FILE, "r") as f:
@@ -79,7 +148,36 @@ def setup_routes(app):
         return {}
 
     def update_pcs_with_daemon_ips(username: str) -> bool:
-        """Update user PC entries with available daemon IPs."""
+        """!
+        @brief Update user PC entries with available daemon IPs for shutdown functionality.
+
+        Automatically updates PC records to use active daemon IP addresses for remote
+        shutdown operations. This function ensures PCs have valid daemon connections
+        by checking daemon availability and updating stale or missing IP addresses.
+
+        Update logic:
+        1. Loads user's PC configuration file
+        2. Checks each PC for missing or non-responsive daemon IP
+        3. Finds the most recently seen daemon from registry
+        4. Updates PC entries with active daemon IPs
+        5. Saves updated configuration if changes were made
+
+        @param username The username whose PC entries should be updated
+        @return True if any PC entries were updated, False if no changes made
+        @retval bool Indicates whether the PC configuration was modified
+
+        @note Only updates PCs that lack IPs or have non-responsive daemons
+        @note Selects most recently seen daemon based on last_seen timestamp
+        @note Preserves all other PC attributes during IP updates
+        @note Logs all IP address changes for audit purposes
+
+        @warning Returns False if user has no PC file or no daemons available
+        @warning Simple selection algorithm may not match optimal daemon for each PC
+
+        @throws json.JSONDecodeError If PC file or daemon registry is corrupted
+        @throws IOError If PC file cannot be read or written
+        @throws Exception Various file system and data processing errors
+        """
         try:
             user_pc_file = user.User.get_user_pc_file(username)
             if not os.path.exists(user_pc_file):
@@ -135,6 +233,36 @@ def setup_routes(app):
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
+        """!
+        @brief Handle user authentication for both web and API clients.
+
+        Provides login functionality supporting both form-based web authentication
+        and JSON-based API authentication. Handles credential validation, session
+        creation, and appropriate response formatting based on client type.
+
+        POST request handling:
+        - JSON requests: Extracts credentials from JSON body
+        - Form requests: Extracts credentials from form data
+        - Validates credentials against user database
+        - Creates Flask-Login session with optional remember functionality
+        - Returns JSON response for API clients or redirect for web clients
+
+        GET request handling:
+        - Returns login form template for web browsers
+
+        @return JSON success/error for API clients, template/redirect for web clients
+        @retval Response Authentication result with appropriate content type
+
+        @note Supports both JSON API and HTML form authentication methods
+        @note Remember me functionality extends session duration
+        @note Logs all authentication attempts and outcomes
+        @note Failed authentication returns 401 status for API clients
+
+        @warning Password is validated in plaintext during transmission
+        @warning Session security depends on proper HTTPS configuration
+
+        @throws Exception Various authentication and session creation errors
+        """
         if request.method == "POST":
 
             if request.is_json:
@@ -167,17 +295,78 @@ def setup_routes(app):
 
     @app.route("/logout")
     def logout():
+        """!
+        @brief Handle user logout and session termination.
+
+        Terminates the current user session using Flask-Login and redirects
+        to the login page. This endpoint is accessible to any authenticated user.
+
+        @return Redirect response to login page
+        @retval Response HTTP redirect to /login endpoint
+
+        @note Uses Flask-Login's logout_user() for proper session cleanup
+        @note Always redirects to login page regardless of user state
+        @note Clears both session data and remember me cookies
+
+        @throws Exception Session cleanup errors are handled by Flask-Login
+        """
         logout_user()
         return redirect(url_for("login"))
 
     @app.route("/")
     @login_required
     def index():
+        """!
+        @brief Serve the main WakeStation web interface dashboard.
+
+        Returns the main HTML interface for authenticated users to manage
+        their Wake-on-LAN devices. This is the primary entry point for the
+        web application after successful authentication.
+
+        @return HTML template response with main interface
+        @retval Response Rendered dashboard template
+
+        @note Requires user authentication via @login_required decorator
+        @note Serves as the default landing page after login
+        @note Template likely contains JavaScript for device management
+
+        @throws Exception Template rendering errors
+        """
         return render_template("index.html", user_permission=current_user.permission)
 
     @app.route("/api/load", methods=["GET"])
     @login_required
     def load_pcs():
+        """!
+        @brief Load and return comprehensive PC status information for the authenticated user.
+
+        API endpoint that retrieves all PCs owned by the current user along with
+        their comprehensive status information including:
+        - Basic PC details (hostname, MAC, IP)
+        - Network reachability status
+        - Wake-on-LAN capability detection
+        - Shutdown daemon availability
+        - Smart IP resolution using daemon registry
+
+        The function automatically updates PC entries with active daemon IPs
+        and saves changes to maintain current connectivity information.
+
+        @return JSON response containing PC list with status or error message
+        @retval Response JSON object with success flag and PC data array
+
+        @note Requires user authentication via @login_required decorator
+        @note Automatically resolves missing/stale IP addresses using daemon registry
+        @note Updates user PC file if IP addresses are resolved/changed
+        @note Comprehensive status includes multiple network connectivity tests
+        @note Logs detailed processing information for debugging
+
+        @warning Large PC lists may take significant time to process due to network tests
+        @warning Network timeouts can cause slow response times
+
+        @throws json.JSONDecodeError If user PC file or daemon registry is corrupted
+        @throws IOError If user PC file cannot be read or written
+        @throws Exception Various network and data processing errors
+        """
         log.info(
             f"API /api/load called by user: {current_user.username if current_user.is_authenticated else 'NOT AUTHENTICATED'}"
         )
@@ -301,6 +490,29 @@ def setup_routes(app):
     @app.route("/api/status", methods=["GET"])
     @login_required
     def check_pc_status():
+        """!
+        @brief Check the network status and daemon availability of a specific IP address.
+
+        API endpoint that performs network connectivity tests for a given IP address:
+        - Ping test to determine if host is reachable
+        - Shutdown daemon availability test on port 8080
+
+        Expected query parameter:
+        - ip: The IP address to check
+
+        @return JSON response with status and daemon availability
+        @retval Response JSON with success flag, status (online/offline), and daemon_available flag
+
+        @note Requires user authentication via @login_required decorator
+        @note Uses ping_host() for basic connectivity testing
+        @note Uses check_shutdown_daemon() for daemon service detection
+        @note Returns 400 error if IP parameter is missing
+        @note Returns 500 error if network tests fail with exceptions
+
+        @warning Network tests may timeout causing slow response times
+
+        @throws Exception Various network connectivity and testing errors
+        """
         ip = request.args.get("ip")
         if not ip:
             return jsonify({"success": False, "message": "IP address required"}), 400
@@ -322,6 +534,35 @@ def setup_routes(app):
     @app.route("/api/add", methods=["POST"])
     @login_required
     def add_pc():
+        """!
+        @brief Add a new PC to the authenticated user's device list.
+
+        API endpoint that allows users to register new Wake-on-LAN devices.
+        Validates input data, checks for duplicates, and stores the PC configuration
+        in the user's personal PC file.
+
+        Expected JSON payload:
+        - hostname: Display name for the PC
+        - mac: MAC address for Wake-on-LAN
+        - ip: Optional IP address for shutdown daemon
+
+        @return JSON response indicating success or failure with appropriate message
+        @retval Response JSON with success flag and descriptive message
+
+        @note Requires user authentication via @login_required decorator
+        @note Validates MAC address format and uniqueness within user's PC list
+        @note Creates user PC file if it doesn't exist
+        @note Automatically attempts to resolve IP if daemon registry is available
+        @note Returns 400 error for invalid JSON or missing required fields
+        @note Returns 409 error for duplicate MAC addresses
+
+        @warning Duplicate MAC addresses are rejected to prevent conflicts
+        @warning Large PC lists may impact performance during duplicate checking
+
+        @throws json.JSONDecodeError If request body contains invalid JSON
+        @throws IOError If user PC file cannot be read or written
+        @throws Exception Various data validation and file system errors
+        """
         user_pc_file = user.User.get_user_pc_file(current_user.username)
         try:
             post_data = request.get_json()
@@ -428,6 +669,32 @@ def setup_routes(app):
     @app.route("/api/delete", methods=["GET"])
     @login_required
     def delete_pc():
+        """!
+        @brief Delete a PC from the authenticated user's device list.
+
+        API endpoint that removes a PC entry from the user's device configuration
+        based on the MAC address. The PC is identified and removed from the user's
+        personal PC file.
+
+        Expected query parameter:
+        - mac: The MAC address of the PC to delete
+
+        @return JSON response indicating success or failure with appropriate message
+        @retval Response JSON with success flag and descriptive message
+
+        @note Requires user authentication via @login_required decorator
+        @note Uses MAC address as unique identifier for PC deletion
+        @note Returns 400 error if MAC parameter is missing
+        @note Returns 404 error if PC with specified MAC is not found
+        @note Automatically saves updated PC list after successful deletion
+
+        @warning Deletion is permanent and cannot be undone
+        @warning Deletes only from the current user's PC list
+
+        @throws json.JSONDecodeError If user PC file is corrupted
+        @throws IOError If user PC file cannot be read or written
+        @throws Exception Various file system and data processing errors
+        """
         mac = request.args.get("mac")
         if mac:
             try:
@@ -625,6 +892,30 @@ def setup_routes(app):
     @app.route("/api/wake", methods=["GET"])
     @login_required
     def wake_pc():
+        """!
+        @brief Send Wake-on-LAN packet to wake up a target PC.
+
+        API endpoint that sends a Wake-on-LAN (WOL) magic packet to wake up
+        a sleeping or powered-off PC using its MAC address. This is the core
+        functionality of the WakeStation server.
+
+        Expected query parameter:
+        - mac: The MAC address of the PC to wake up
+
+        @return JSON response indicating success or failure of the wake operation
+        @retval Response JSON with success flag and descriptive message
+
+        @note Requires user authentication via @login_required decorator
+        @note Uses wake_device() utility function to send the magic packet
+        @note Logs all wake requests with user and MAC address for auditing
+        @note Returns 200 status for successful wake, 500 for failures
+        @note Returns 400 error if MAC parameter is missing
+
+        @warning Wake-on-LAN requires target PC to have WOL enabled in BIOS/UEFI
+        @warning PC must be connected to power and network for wake to succeed
+
+        @throws Exception Various network and wake packet transmission errors
+        """
         mac = request.args.get("mac")
         if mac:
             log.info(f"Wake-on-LAN request for MAC: {mac} by user: {current_user.id}")
@@ -738,3 +1029,85 @@ def setup_routes(app):
         except Exception as e:
             log.error(f"Error in syncing encryption key: {str(e)}")
             return jsonify({"success": False, "message": "Internal server error"}), 500
+
+    @app.route("/api/llm_command", methods=["POST"])
+    @login_required
+    def llm_command():
+        """!
+        @brief Process natural language Wake-on-LAN commands via LLM integration.
+
+        API endpoint that allows users to send natural language commands like
+        "wake andrew-pc" to control their registered PCs using an LLM for parsing.
+        The LLM analyzes the command against the user's PC list and executes
+        appropriate actions.
+
+        Expected JSON payload:
+        - command: Natural language command (e.g., "wake andrew-pc", "status of all computers")
+        - llm_endpoint: Optional custom LLM endpoint URL
+
+        @return JSON response with LLM interpretation and action results
+        @retval Response JSON with success flag, LLM response, and action details
+
+        @note Requires user authentication via @login_required decorator
+        @note Uses existing PC data and wake functions for actual operations
+        @note Communicates with local LLM at http://127.0.0.1:1234/v1/chat/completions by default
+        @note Returns detailed response including LLM interpretation and execution results
+
+        @warning Requires local LLM service to be running at specified endpoint
+        @warning Network timeouts may occur if LLM service is slow or unavailable
+
+        @throws Exception Various LLM communication and command execution errors
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return (
+                    jsonify({"success": False, "message": "No JSON data received"}),
+                    400,
+                )
+
+            command = data.get("command")
+            if not command:
+                return (
+                    jsonify(
+                        {"success": False, "message": "Command parameter is required"}
+                    ),
+                    400,
+                )
+
+            llm_endpoint = data.get(
+                "llm_endpoint", "http://127.0.0.1:1234/v1/chat/completions"
+            )
+
+            # Import and use the LLM integration
+            from ..utils.llm_integration import process_natural_language_command
+
+            log.info(
+                f"Processing LLM command for user {current_user.username}: {command}"
+            )
+
+            # Generate session ID for conversation context (use username as simple session)
+            session_id = f"{current_user.username}_{request.remote_addr}"
+
+            result = process_natural_language_command(
+                username=current_user.username,
+                command=command,
+                llm_endpoint=llm_endpoint,
+                session_id=session_id,
+            )
+
+            status_code = 200 if result["success"] else 500
+            return jsonify(result), status_code
+
+        except Exception as e:
+            log.error(f"Error processing LLM command: {e}")
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Internal server error",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )

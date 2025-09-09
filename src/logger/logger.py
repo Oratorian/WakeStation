@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """!
 ********************************************************************************
-@file   logger.py
 @brief  Professional logging system with rsyslog-style formatting and rotation
+
+@file   logger.py
 @author Mahesvara ( https://github.com/Oratorian )
 @copyright Mahesvara ( https://github.com/Oratorian )
 ********************************************************************************

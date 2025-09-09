@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """!
 ********************************************************************************
-@file   gen_version.py
 @brief  Utility script to create version info files for PyInstaller executables
+
+@file   gen_version.py
 @author timounger ( https://github.com/timounger )
 @modified by Mahesvara ( https://github.com/Oratorian )
 @copyright timounger ( https://github.com/timounger )

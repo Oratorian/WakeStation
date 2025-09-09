@@ -2,7 +2,6 @@
 """!
 ********************************************************************************
 @file   __init__.py
-@brief  Logger package initialization for WakeStation logging system
 @author Mahesvara ( https://github.com/Oratorian )
 @copyright Mahesvara ( https://github.com/Oratorian )
 ********************************************************************************

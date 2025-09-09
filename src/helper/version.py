@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """!
 ********************************************************************************
-@file   version.py
 @brief  Version and general information for WakeStation
+
+@file   version.py
 @author timounger ( https://github.com/timounger )
 @modified by Mahesvara ( https://github.com/Oratorian )
 @copyright timounger ( https://github.com/timounger )
