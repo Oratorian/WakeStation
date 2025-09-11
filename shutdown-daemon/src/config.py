@@ -65,9 +65,9 @@ System Tray:
     parser.add_argument(
         "--wol-server-port",
         type=int,
-        default=int(DEFAULT_WOL_SERVER_PORT),
+        default=None,  # Use None to detect if user explicitly provided this argument
         metavar="PORT",
-        help="Port of the WakeStation WOL server (default: %(default)s or WOL_SERVER_PORT env var)",
+        help=f"Port of the WakeStation WOL server (default: {DEFAULT_WOL_SERVER_PORT} or WOL_SERVER_PORT env var)",
     )
     parser.add_argument(
         "--bind-ip",

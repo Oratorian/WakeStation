@@ -1,0 +1,16 @@
+[Unit]
+Description=Gunicorn instance to serve wol_server
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+AmbientCapabilities=CAP_SETFCAP
+WorkingDirectory=/opt/wol
+ExecStartPre=/usr/sbin/setcap cap_net_raw+ep /usr/sbin/arp-scan
+ExecStart=/opt/wol/.wol/bin/gunicorn --workers 1 --bind 0.0.0.0:8889 wakestation:app
+ExecStop=/usr/sbin/setcap cap_net_raw-ep /usr/sbin/arp-scan
+#ExecStop=/usr/local/bin/gunicorn --pid /run/gunicorn/pid --workers 1 --bind 0.0.0.0:8889 --graceful-timeout 30 --timeout 60 wakestation:app
+
+[Install]
+WantedBy=multi-user.target

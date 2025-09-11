@@ -170,6 +170,63 @@ def get_machine_interfaces():
     return interfaces
 
 
+def get_interface_name_for_ip(ip_address):
+    """
+    Get the network interface name for a given IP address.
+    Returns interface name (e.g., 'eth0', 'wlan0') or None if not found.
+    """
+    if not ip_address or not validate_ip_address(ip_address):
+        return None
+    
+    try:
+        if platform.system().lower() == "windows":
+            # Windows: Use route command to find interface
+            result = subprocess.run(
+                ["route", "print", "0.0.0.0"], 
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                # Parse routing table to find interface for IP
+                import re
+                # Look for lines with our IP in the interface column
+                for line in result.stdout.split('\n'):
+                    if ip_address in line:
+                        # Extract interface index from route table
+                        parts = line.split()
+                        if len(parts) >= 4:
+                            return parts[3]  # Interface column
+        else:
+            # Linux: Parse ip addr show to find interface with this IP
+            # Note: ip route get <local_ip> returns 'lo' for local IPs, so we use ip addr instead
+            try:
+                result = subprocess.run(
+                    ["ip", "addr", "show"],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    import re
+                    lines = result.stdout.split('\n')
+                    current_interface = None
+                    
+                    for line in lines:
+                        # Look for interface lines: "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP>"
+                        interface_match = re.match(r'^\d+:\s+(\S+):', line)
+                        if interface_match:
+                            current_interface = interface_match.group(1)
+                        # Look for IP lines: "    inet 10.0.1.13/24 brd 10.0.1.255 scope global br0"
+                        elif current_interface and f"inet {ip_address}/" in line:
+                            # Skip loopback interface
+                            if current_interface != "lo":
+                                return current_interface
+            except subprocess.SubprocessError:
+                pass
+                
+    except Exception as e:
+        log.debug(f"Failed to get interface name for IP {ip_address}: {e}")
+    
+    return None
+
+
 def get_wol_interface():
     """Get the configured WOL interface IP, with validation that it belongs to us"""
     wol_interface = getattr(config, "WOL_INTERFACE", None)
@@ -267,6 +324,70 @@ def get_daemon_networks(daemon_registry):
     return networks
 
 
+def get_network_scan_cache(daemon_registry=None, cache_duration=30):
+    """
+    Perform network-wide arp-scan and cache results to avoid redundant scans.
+    
+    Args:
+        daemon_registry: Dict of registered daemons
+        cache_duration: Cache duration in seconds
+    
+    Returns:
+        Dict of {mac_address: ip_address} for all discovered devices
+    """
+    import time
+    
+    # Check if we have a recent cached result
+    cache_key = "_network_scan_cache"
+    cache_time_key = "_network_scan_time"
+    
+    if hasattr(get_network_scan_cache, cache_key):
+        cached_time = getattr(get_network_scan_cache, cache_time_key, 0)
+        if time.time() - cached_time < cache_duration:
+            log.debug("Using cached network scan results")
+            return getattr(get_network_scan_cache, cache_key)
+    
+    log.debug("Performing fresh network scan for all devices")
+    all_devices = {}
+    
+    # Get all networks to scan
+    networks_to_scan = []
+    
+    # Add daemon networks
+    if daemon_registry:
+        daemon_networks = get_daemon_networks(daemon_registry)
+        networks_to_scan.extend(daemon_networks)
+    
+    # Add local WOL network
+    try:
+        local_network = get_local_network()
+        if local_network and local_network not in networks_to_scan:
+            networks_to_scan.append(local_network)
+    except:
+        pass
+    
+    # If no specific networks, scan local
+    if not networks_to_scan:
+        networks_to_scan = [None]  # Will use --local
+    
+    # Scan each unique network
+    for network in networks_to_scan:
+        try:
+            devices = arp_scan_network(network)
+            for ip, mac in devices.items():
+                # Use MAC as key for device lookup
+                all_devices[mac] = ip
+        except Exception as e:
+            log.debug(f"Failed to scan network {network}: {e}")
+    
+    # Cache the results
+    setattr(get_network_scan_cache, cache_key, all_devices)
+    setattr(get_network_scan_cache, cache_time_key, time.time())
+    
+    log.info(f"Network scan found {len(all_devices)} total devices across all networks")
+    return all_devices
+
+
 def resolve_pc_ip(pc_data, daemon_registry=None):
     """
     Resolve the best IP address for a PC using multiple sources.
@@ -304,20 +425,17 @@ def resolve_pc_ip(pc_data, daemon_registry=None):
                     )
                     return daemon_info["ip"], "daemon"
 
-    # Priority 3: Use arp-scan to find online devices by MAC
+    # Priority 3: Use cached network scan to find devices by MAC
     if mac and validate_mac_address(mac):
-        # First try daemon networks, then local scan
-        networks_to_scan = []
-        if daemon_registry:
-            daemon_networks = get_daemon_networks(daemon_registry)
-            networks_to_scan.extend(daemon_networks)
-
-        log.debug(f"Attempting arp-scan for {hostname} (MAC: {mac})")
-        found_ip = find_device_by_mac(
-            mac, networks_to_scan if networks_to_scan else None
-        )
-        if found_ip:
-            log.info(f"Found {hostname} via arp-scan: {found_ip}")
+        log.debug(f"Checking cached network scan for {hostname} (MAC: {mac})")
+        
+        # Get cached network scan results (or perform fresh scan if needed)
+        network_devices = get_network_scan_cache(daemon_registry)
+        mac_normalized = normalize_mac_address(mac)
+        
+        if mac_normalized in network_devices:
+            found_ip = network_devices[mac_normalized]
+            log.info(f"Found {hostname} via network scan cache: {found_ip}")
             return found_ip, "arp-scan"
 
     # Priority 4: Use stored IP if available and reachable
@@ -361,6 +479,20 @@ def arp_scan_network(network=None, timeout=3):
                     break
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 continue
+        
+        # If arp-scan found but might need sudo, try with sudo first
+        if cmd and platform.system().lower() != "windows":
+            # Check if we can run arp-scan without sudo first
+            try:
+                test_result = subprocess.run(
+                    cmd + ["--help"], capture_output=True, timeout=2
+                )
+                # If it needs root, try with sudo
+                if "Operation not permitted" in str(test_result.stderr) or test_result.returncode != 0:
+                    cmd = ["sudo"] + cmd
+                    log.debug("arp-scan requires sudo privileges")
+            except:
+                pass
 
         if not cmd:
             log.warning("arp-scan command not found")
@@ -380,59 +512,122 @@ def arp_scan_network(network=None, timeout=3):
                 )  # Default to common private range
         else:
             # Standard Linux arp-scan syntax
-            if network:
-                cmd.append(network)
-            else:
-                cmd.append("--local")  # Scan local networks
-
-            # Add timeout option (--quiet might not be available on all versions)
+            # Build options first, then add network/target as last argument
+            
+            # Add timeout option and format for consistent output
             cmd.extend(["--timeout", str(timeout * 1000)])
+            cmd.extend(["--format", "${IP}\\t${MAC}\\t${Vendor}"])
+            
+            # Add interface specification for multi-NIC systems
+            try:
+                wol_ip = get_wol_interface()
+                interface_name = get_interface_name_for_ip(wol_ip)
+                if interface_name:
+                    cmd.append(f"--interface={interface_name}")
+                    log.debug(f"Using interface {interface_name} for arp-scan")
+            except Exception as e:
+                log.debug(f"Could not determine interface for arp-scan: {e}")
+            
+            # Add network/target as LAST argument
+            if network:
+                # Network explicitly provided
+                cmd.append(network)
+                log.debug(f"Using explicit network {network} for arp-scan")
+            else:
+                # No network specified - try to use WOL_INTERFACE network
+                try:
+                    wol_ip = get_wol_interface()
+                    wol_network = get_local_network(wol_ip)  # Gets network in format like "10.0.1.0/24"
+                    
+                    if wol_network:
+                        cmd.append(wol_network)
+                        log.debug(f"Using WOL network {wol_network} for arp-scan")
+                    else:
+                        cmd.append("--local")  # Fallback to local scan
+                        log.debug("Using --local for arp-scan (WOL network detection failed)")
+                except Exception as e:
+                    log.debug(f"Could not determine WOL network for arp-scan, using --local: {e}")
+                    cmd.append("--local")  # Fallback to local scan
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout + 5
-        )
+        log.debug(f"Executing arp-scan command: {' '.join(cmd)}")
+        try:
+            # arp-scan can take a while scanning large networks, give it plenty of time
+            # The --timeout parameter controls arp-scan's internal timeout per host
+            subprocess_timeout = max(timeout * 2, 15)  # At least 15 seconds for subprocess
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=subprocess_timeout
+            )
+            log.debug(f"arp-scan command completed with return code: {result.returncode}")
+            if result.stderr:
+                log.debug(f"arp-scan stderr: {result.stderr}")
+        except subprocess.TimeoutExpired:
+            log.warning(f"arp-scan command timed out after {subprocess_timeout} seconds")
+            raise
+        except Exception as e:
+            log.warning(f"arp-scan subprocess error: {e}")
+            raise
 
-        if result.returncode == 0:
+        # arp-scan returns different exit codes:
+        # 0 = success with responses, 1 = success but no responses, 2+ = error
+        # We should accept both 0 and 1 as success if we have output
+        if result.returncode <= 1 and result.stdout.strip():
+            log.debug(f"arp-scan completed successfully with return code {result.returncode}")
+        elif result.stdout.strip():
+            log.debug(f"arp-scan had output despite return code {result.returncode}, processing anyway")
+        else:
+            log.warning(f"arp-scan failed - no output and return code {result.returncode}")
+            return {}
+        
+        if result.stdout.strip():
             devices = {}
+            log.debug(f"arp-scan raw output:\n{result.stdout}")
             for line in result.stdout.strip().split("\n"):
                 line = line.strip()
                 if not line:
                     continue
 
-                # Handle different arp-scan output formats
-                if "Reply that" in line:
-                    # Format: "Reply that 22:C9:84:0C:0F:BE is 10.0.1.2 in 14.917100"
-                    match = re.search(
-                        r"Reply that ([0-9A-Fa-f:-]+) is (\d+\.\d+\.\d+\.\d+)", line
-                    )
-                    if match:
-                        raw_mac = match.group(1)
-                        ip = match.group(2)
-                        mac = normalize_mac_address(raw_mac)
-                        if validate_ip_address(ip) and mac:
-                            devices[ip] = mac
+                # Skip arp-scan header and footer lines
+                if (line.startswith("Interface:") or 
+                    line.startswith("Starting arp-scan") or 
+                    line.startswith("Ending arp-scan") or
+                    "packets received by filter" in line or
+                    "packets dropped by kernel" in line or
+                    "hosts scanned in" in line):
+                    continue
+
+                # With --format='${IP}\t${MAC}\t${Vendor}', output should be tab-separated
+                # Format: "10.0.1.110	90:78:41:68:8a:17	Intel Corporate"
+                parts = line.split("\t")
+                if len(parts) >= 2:
+                    ip = parts[0].strip()
+                    raw_mac = parts[1].strip()
+                    mac = normalize_mac_address(raw_mac)
+                    if validate_ip_address(ip) and mac:
+                        devices[ip] = mac
+                        log.debug(f"Parsed arp-scan result: {ip} -> {mac}")
                 else:
-                    # Standard format: "192.168.1.100	aa:bb:cc:dd:ee:ff	Vendor"
-                    parts = line.split("\t")
+                    # Fallback for cases where format might not work - parse space-separated
+                    parts = line.split()
                     if len(parts) >= 2:
                         ip = parts[0].strip()
                         raw_mac = parts[1].strip()
                         mac = normalize_mac_address(raw_mac)
                         if validate_ip_address(ip) and mac:
                             devices[ip] = mac
+                            log.debug(f"Parsed arp-scan result (fallback): {ip} -> {mac}")
             log.info(
                 f"arp-scan found {len(devices)} devices on {network or 'local network'}"
             )
             return devices
-        else:
-            # arp-scan not available or failed, return empty dict
-            return {}
 
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError):
-        # arp-scan not installed or failed, try Windows fallback
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+        # arp-scan not installed or failed, try fallback methods
+        log.warning(f"arp-scan command failed with exception: {e}")
         if platform.system().lower() == "windows":
             return _windows_network_scan(network, timeout)
-        return {}
+        else:
+            # Linux/Unix fallback: try using ARP table
+            return _linux_arp_table_scan(network, timeout)
 
 
 def _windows_network_scan(network=None, timeout=3):
@@ -478,6 +673,85 @@ def _windows_network_scan(network=None, timeout=3):
     except (subprocess.SubprocessError, subprocess.TimeoutExpired):
         pass
 
+    return {}
+
+
+def _linux_arp_table_scan(network=None, timeout=3):
+    """
+    Linux fallback for arp-scan using arp -a and /proc/net/arp.
+    Returns dict of {ip: mac} for devices in ARP table.
+    """
+    try:
+        devices = {}
+        
+        # Method 1: Try /proc/net/arp (most reliable)
+        try:
+            with open('/proc/net/arp', 'r') as f:
+                lines = f.readlines()
+                for line in lines[1:]:  # Skip header
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        ip = parts[0]
+                        mac = parts[3]
+                        # Skip incomplete entries
+                        if mac != "00:00:00:00:00:00" and ":" in mac:
+                            mac_normalized = normalize_mac_address(mac)
+                            if validate_ip_address(ip) and mac_normalized:
+                                # Filter by network if specified
+                                if network:
+                                    try:
+                                        import ipaddress
+                                        network_obj = ipaddress.ip_network(network, strict=False)
+                                        if ipaddress.ip_address(ip) not in network_obj:
+                                            continue
+                                    except (ValueError, ImportError):
+                                        continue
+                                devices[ip] = mac_normalized
+            
+            if devices:
+                log.debug(f"Found {len(devices)} devices via /proc/net/arp")
+                return devices
+        except (FileNotFoundError, PermissionError):
+            pass
+        
+        # Method 2: Fallback to arp -a command
+        try:
+            result = subprocess.run(
+                ["arp", "-a"], capture_output=True, text=True, timeout=timeout
+            )
+            
+            if result.returncode == 0:
+                import re
+                # Parse arp -a output: "hostname (10.0.1.2) at aa:bb:cc:dd:ee:ff [ether] on eth0"
+                for line in result.stdout.split("\n"):
+                    match = re.search(r'\((\d+\.\d+\.\d+\.\d+)\) at ([0-9a-fA-F:]{17})', line)
+                    if match:
+                        ip = match.group(1)
+                        mac = match.group(2)
+                        mac_normalized = normalize_mac_address(mac)
+                        
+                        # Filter by network if specified
+                        if network:
+                            try:
+                                import ipaddress
+                                network_obj = ipaddress.ip_network(network, strict=False)
+                                if ipaddress.ip_address(ip) not in network_obj:
+                                    continue
+                            except (ValueError, ImportError):
+                                continue
+                        
+                        if validate_ip_address(ip) and mac_normalized:
+                            devices[ip] = mac_normalized
+            
+            log.debug(f"Found {len(devices)} devices via arp -a fallback")
+            return devices
+        
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+            pass
+        
+    except Exception as e:
+        log.debug(f"Linux ARP table scan failed: {e}")
+    
     return {}
 
 

@@ -1,5 +1,39 @@
 # Changelog
 
+## 🚀 [v2.9.2] - 11-September-2025
+**Summary:** Critical network discovery and configuration bug fixes for multi-NIC systems and shutdown daemon reliability.
+
+### 🐛 Fixed
+- 🚀 **Fixed shutdown daemon race condition on fresh start** - Added synchronization after GUI dialog completion to ensure config files are written before server startup
+- 🌐 **Fixed arp-scan multi-NIC interface issues** - Complete resolution for systems with multiple network interfaces:
+  - Added reliable interface detection from IP addresses using `ip addr show` parsing
+  - Fixed `--interface=<name>` parameter format (requires equals sign)
+  - Corrected command argument order (network/CIDR must be last argument)
+  - Implemented proper `--format` parameter with correct field names (`${IP}`, `${MAC}`, `${Vendor}`)
+  - Fixed arp-scan return code handling (accepts 0-1 as success, not just 0)
+  - Added robust fallback methods (`/proc/net/arp`, `arp -a`) when arp-scan fails
+  - Increased subprocess timeout to handle network scans properly
+- 🔧 **Fixed WOL_SERVER_PORT configuration persistence** - Resolved issue where shutdown daemon ignored GUI-configured port values:
+  - Fixed CLI argument vs `.env` file precedence detection
+  - Ensured GUI setup dialog values are properly used by daemon
+  - Corrected port value loading after configuration completion
+- 🔍 **Enhanced error handling and debugging** - Added comprehensive debug logging for arp-scan operations, better subprocess error detection, and enhanced network interface validation
+- 🛡️ **Fixed systemd service capabilities** - Added proper CAP_SETFCAP capabilities and setcap commands to resolve arp-scan packet capture permissions
+
+### 🔄 Changed
+- 🌐 **Improved network interface detection** - Now uses `ip addr show` instead of unreliable `ip route get` for local IP interface resolution
+- ⏱️ **Enhanced timeout handling** - Increased arp-scan subprocess timeout to minimum 15 seconds to accommodate network scanning
+- 🔧 **Better configuration precedence** - CLI arguments properly detected vs defaults to allow `.env` file values when appropriate
+
+### ⚡ Performance
+- 🚀 **Optimized network scanning** - Implemented single arp-scan per network with 30-second caching instead of per-device scanning:
+  - Network-wide scanning reduces multiple arp-scan calls to single scan per network
+  - 30-second result caching for instant subsequent device lookups
+  - Dramatically improved page load times when viewing multiple devices
+  - Smart cache invalidation ensures fresh data when needed
+
+---
+
 ## 🚀 [v2.9.1] - 07-September-2025
 **Summary:** Critical bug fixes for shutdown daemon functionality and cross-platform Wake-on-LAN implementation.
 
