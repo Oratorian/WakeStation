@@ -55,7 +55,7 @@ def main():
     # CLI arguments take precedence over environment variables
     WOL_SERVER_PORT = (
         args.wol_server_port
-        if args.wol_server_port
+        if args.wol_server_port is not None
         else int(os.getenv("WOL_SERVER_PORT", "8888"))
     )
     BIND_IP = args.bind_ip if args.bind_ip else os.getenv("BIND_IP", "0.0.0.0")
@@ -88,8 +88,13 @@ def main():
 
         if needs_setup:
             if TRAY_AVAILABLE:
-                # Show setup dialog
+                # Show setup dialog and wait for completion
                 users = initialize_users_dialog()
+                
+                # Ensure files are properly written before proceeding
+                import time
+                time.sleep(0.1)  # Brief pause to ensure file operations complete
+                
                 # Reload .env file after configuration is created
                 load_dotenv(override=True)
                 # Re-validate variables with new configuration
@@ -97,7 +102,7 @@ def main():
                 # Also reload other variables that might have changed - CLI args still take precedence
                 WOL_SERVER_PORT = (
                     args.wol_server_port
-                    if args.wol_server_port
+                    if args.wol_server_port is not None
                     else int(os.getenv("WOL_SERVER_PORT", "8888"))
                 )
                 BIND_IP = (
@@ -108,6 +113,8 @@ def main():
                     if args.bind_port
                     else int(os.getenv("BIND_PORT", "8080"))
                 )
+                
+                log.info("Configuration completed successfully, proceeding with server startup")
             else:
                 # GUI not available - cannot do interactive setup
                 log.error("Setup required but GUI not available.")

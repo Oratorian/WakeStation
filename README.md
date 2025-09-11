@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![WakeStation](https://img.shields.io/badge/WakeStation-v2.9.1-00ff88?style=for-the-badge&logo=wifi&logoColor=white)
+![WakeStation](https://img.shields.io/badge/WakeStation-v2.9.2-00ff88?style=for-the-badge&logo=wifi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-0099ff?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge&logo=gnu&logoColor=white)
 ![Build Status](https://img.shields.io/github/actions/workflow/status/Oratorian/WakeStation/release.yml?style=for-the-badge&logo=github&logoColor=white&label=Build)
@@ -67,7 +67,7 @@
 
 ### 📦 1. Install arp-scan (Linux Only)
 
-**Note:** WakeStation v2.9.1+ uses cross-platform Python socket implementation for Wake-on-LAN packets (no more etherwake dependency required).
+**Note:** WakeStation v2.9.2+ uses cross-platform Python socket implementation for Wake-on-LAN packets (no more etherwake dependency required).
 
 **Ubuntu/Debian:**
 ```bash
@@ -95,6 +95,25 @@ sudo pacman -S arp-scan
 **openSUSE:**
 ```bash
 sudo zypper install arp-scan
+```
+
+**⚠️ Important: arp-scan Packet Capture Permissions**
+
+arp-scan requires raw packet capture capabilities. Choose one of these methods:
+
+**Method 1: Grant capabilities to arp-scan binary (recommended for manual/development setups):**
+```bash
+sudo setcap cap_net_raw+ep /usr/bin/arp-scan
+```
+
+**Method 2: Use systemd service (recommended for production):**
+The included `wakestation.service` file automatically handles arp-scan capabilities. See [WakeStation Server Setup](#️-wakestation-server-setup) section.
+
+**Method 3: Add user to network group (varies by distribution):**
+```bash
+# Some distributions (check your system documentation)
+sudo usermod -a -G netdev $USER  # or wireshark group
+# Logout and login required
 ```
 
 ### ⬇️ 2. Download WakeStation
