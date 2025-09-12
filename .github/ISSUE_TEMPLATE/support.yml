@@ -1,0 +1,146 @@
+name: Support/Question
+description: Ask a question or get help with using the project
+title: "[Question]: "
+labels: ["question", "support"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reaching out! We're here to help. Please provide as much detail as possible so we can assist you effectively.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before asking your question
+      options:
+        - label: I have searched existing issues and discussions for similar questions
+          required: true
+        - label: I have read the documentation and FAQ (if available)
+          required: true
+        - label: This is not a bug report (use the Bug Report template for bugs)
+          required: true
+
+  - type: dropdown
+    id: question-type
+    attributes:
+      label: Question Type
+      description: What type of help do you need?
+      options:
+        - General Usage Question
+        - Installation/Setup Help
+        - Configuration Help
+        - Integration Question
+        - Best Practices
+        - Troubleshooting (not a bug)
+        - Performance Question
+        - Security Question
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Please describe your question or what you need help with
+      placeholder: What do you need help with?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Please provide context about what you're trying to accomplish
+      placeholder: |
+        - What are you trying to achieve?
+        - What is your use case?
+        - What have you already tried?
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current Situation
+      description: Describe what's currently happening (if applicable)
+      placeholder: What is happening now? What output/behavior are you seeing?
+
+  - type: textarea
+    id: expected-outcome
+    attributes:
+      label: Expected Outcome
+      description: What outcome are you hoping to achieve?
+      placeholder: What should happen? What are you trying to accomplish?
+
+  - type: textarea
+    id: code-sample
+    attributes:
+      label: Code Sample
+      description: If applicable, please provide a code sample or configuration
+      placeholder: |
+        ```
+        // Your code here
+        ```
+      render: markdown
+
+  - type: textarea
+    id: error-messages
+    attributes:
+      label: Error Messages/Output
+      description: If you're getting any error messages or unexpected output, please include them here
+      placeholder: Paste any error messages or output here...
+      render: shell
+
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - Windows
+        - macOS
+        - Linux (Ubuntu)
+        - Linux (Debian)
+        - Linux (Fedora)
+        - Linux (Arch)
+        - Linux (Other)
+        - Other
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version are you using?
+      placeholder: e.g. v1.0.0, commit hash, branch name
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Please provide relevant environment details
+      placeholder: |
+        - Node.js version: 
+        - Python version:
+        - Browser (if applicable):
+        - Any other relevant details...
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency Level
+      description: How urgent is this question for you?
+      options:
+        - Low - No rush, when convenient
+        - Medium - Would like help soon
+        - High - Blocking my work
+        - Critical - Production issue
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Any other information that might be helpful
+      placeholder: Anything else you think would be helpful for us to know...

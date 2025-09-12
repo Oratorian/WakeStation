@@ -1,0 +1,115 @@
+name: Feature Request
+description: Suggest an idea for this project
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a new feature! We appreciate your input and ideas for improving the project.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting your feature request
+      options:
+        - label: I have searched for existing feature requests that may be the same as or related to mine
+          required: true
+        - label: I have read the documentation and confirmed this feature doesn't already exist
+          required: true
+
+  - type: textarea
+    id: problem-description
+    attributes:
+      label: Problem Description
+      description: Is your feature request related to a problem? Please describe what problem this feature would solve.
+      placeholder: A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+    validations:
+      required: false
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Describe the feature you'd like to see implemented
+      placeholder: A clear and concise description of what you want to happen...
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: Describe specific use cases for this feature
+      placeholder: |
+        1. As a [user type], I want to [action] so that [benefit]
+        2. When [scenario], I need to [action] because [reason]
+        3. This would help with [specific situation]
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: If you have ideas on how this feature could be implemented, please describe them
+      placeholder: Describe your proposed solution or implementation approach...
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Describe any alternative solutions or features you've considered
+      placeholder: What other approaches could solve this problem?
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would be helpful
+        - High - Important for my use case
+        - Critical - Blocking my use case
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Implementation Complexity (if known)
+      description: If you have technical knowledge, how complex do you think this feature would be to implement?
+      options:
+        - I don't know
+        - Low - Simple change
+        - Medium - Moderate effort
+        - High - Significant development required
+        - Very High - Major architectural changes needed
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups/Examples
+      description: If applicable, add mockups, examples, or references to similar implementations
+      placeholder: Paste images, links, or describe examples here...
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or examples about the feature request here
+      placeholder: Any other information that would be helpful...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to help implement this feature?
+      options:
+        - label: I would be willing to contribute to the implementation of this feature
+          required: false
+        - label: I would be willing to test this feature once implemented
+          required: false

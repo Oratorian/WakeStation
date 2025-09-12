@@ -1,0 +1,150 @@
+name: Documentation Issue
+description: Report missing, incorrect, or unclear documentation
+title: "[Docs]: "
+labels: ["documentation", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve our documentation! Clear and accurate docs are essential for a great user experience.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting this documentation issue
+      options:
+        - label: I have searched for existing documentation issues that may be the same as or related to mine
+          required: true
+        - label: I have checked if this might be covered in existing documentation that I missed
+          required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Documentation Issue Type
+      description: What type of documentation issue is this?
+      options:
+        - Missing Documentation - Feature/topic not documented
+        - Incorrect Information - Documentation contains errors
+        - Unclear/Confusing - Documentation is hard to understand
+        - Outdated Information - Documentation is no longer accurate
+        - Broken Links/References - Links or references don't work
+        - Formatting/Display Issue - Documentation displays incorrectly
+        - Missing Examples - Need code examples or use cases
+        - API Documentation - Issues with API/method documentation
+        - Installation/Setup Docs - Issues with setup instructions
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: documentation-location
+    attributes:
+      label: Documentation Location
+      description: Where is the documentation issue located?
+      placeholder: e.g., README.md, docs/api.md, wiki page, inline comments, specific URL
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue-description
+    attributes:
+      label: Issue Description
+      description: Clearly describe the documentation issue
+      placeholder: What is wrong, missing, or unclear in the documentation?
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-content
+    attributes:
+      label: Current Documentation Content
+      description: If applicable, quote or describe the current documentation that has issues
+      placeholder: |
+        Current text or description:
+        ```
+        [paste current content here]
+        ```
+
+  - type: textarea
+    id: suggested-improvement
+    attributes:
+      label: Suggested Improvement
+      description: How do you think the documentation should be improved?
+      placeholder: |
+        What should be changed, added, or clarified?
+        
+        Suggested content:
+        ```
+        [your suggested content here]
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context/Use Case
+      description: Describe the context or use case that led you to discover this issue
+      placeholder: |
+        - What were you trying to do when you encountered this issue?
+        - What information were you looking for?
+        - How did this impact your experience?
+
+  - type: dropdown
+    id: user-level
+    attributes:
+      label: Target Audience
+      description: What level of user would this documentation improvement help?
+      options:
+        - Beginner - New users getting started
+        - Intermediate - Users with some experience
+        - Advanced - Experienced users
+        - Developer - Contributors/developers
+        - All Users - Everyone would benefit
+    validations:
+      required: true
+
+  - type: textarea
+    id: examples-needed
+    attributes:
+      label: Examples/Code Samples Needed
+      description: If you're requesting examples or code samples, please specify what would be helpful
+      placeholder: |
+        What kind of examples would be helpful?
+        - Code examples for [specific scenario]
+        - Usage examples for [feature]
+        - Configuration examples for [use case]
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Impact/Priority
+      description: How much does this documentation issue impact users?
+      options:
+        - Low - Minor improvement
+        - Medium - Noticeable impact on user experience
+        - High - Significantly affects users' ability to use the project
+        - Critical - Prevents users from accomplishing basic tasks
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or information about the documentation issue
+      placeholder: Any other details that would be helpful...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to help improve the documentation?
+      options:
+        - label: I would be willing to submit a pull request to fix this documentation issue
+          required: false
+        - label: I would be willing to review proposed documentation changes
+          required: false
