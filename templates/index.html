@@ -561,6 +561,40 @@
             opacity: 0.5;
         }
 
+        .encryption-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid var(--warning);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .warning-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .warning-content .material-icons-outlined {
+            color: var(--warning);
+            font-size: 1.5rem;
+            margin-top: 0.1rem;
+        }
+
+        .warning-text strong {
+            color: var(--warning);
+            font-weight: 600;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .warning-text p {
+            color: var(--text-secondary);
+            margin: 0;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
         @media (max-width: 768px) {
             .container { padding: 1rem; }
             .main-title { font-size: 2rem; }
@@ -836,6 +870,15 @@
                     <i class="material-icons-outlined">power_settings_new</i>
                     Remote Shutdown
                 </h3>
+                <div id="encryption-warning" class="encryption-warning" style="display: none;">
+                    <div class="warning-content">
+                        <i class="material-icons-outlined">warning</i>
+                        <div class="warning-text">
+                            <strong>End-to-end encryption unavailable</strong>
+                            <p id="warning-reason">Credentials will be encrypted on server instead.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-grid">
                     <div class="input-group">
                         <input id="modal-username" type="text" class="input-field" placeholder="Username" required>
@@ -861,6 +904,7 @@
     <div id="message" class="status-indicator" style="position: fixed; top: 1rem; right: 1rem; display: none; z-index: 9999;"></div>
 
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-    <script type="text/javascript" src="/js/wol.js?v=6"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script type="text/javascript" src="/js/wol.js?v=8"></script>
 </body>
 </html>

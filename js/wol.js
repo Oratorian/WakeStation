@@ -1,4 +1,123 @@
+// Global variables for encryption
+let encryptionKey = null;
+let encryptionStatus = {
+    available: false,
+    reason: null
+};
+
+// Encryption functions matching Python implementation
+function loadEncryptionKey() {
+    return new Promise((resolve, reject) => {
+        if (encryptionKey) {
+            resolve(encryptionKey);
+            return;
+        }
+        
+        $.ajax({
+            type: 'GET',
+            url: '/api/get_encryption_key',
+            success: function(data) {
+                if (data.success) {
+                    encryptionKey = data.encryption_key;
+                    encryptionStatus.available = true;
+                    encryptionStatus.reason = null;
+                    resolve(encryptionKey);
+                } else {
+                    encryptionStatus.available = false;
+                    encryptionStatus.reason = 'Server failed to provide encryption key: ' + data.message;
+                    reject(new Error(encryptionStatus.reason));
+                }
+            },
+            error: function(xhr, status, error) {
+                encryptionStatus.available = false;
+                encryptionStatus.reason = 'Failed to fetch encryption key from server: ' + error;
+                reject(new Error(encryptionStatus.reason));
+            },
+            dataType: 'json'
+        });
+    });
+}
+
+function encryptData(data) {
+    if (!encryptionKey) {
+        throw new Error('Encryption key not loaded');
+    }
+    
+    // Convert base64 key to WordArray
+    const keyBytes = CryptoJS.enc.Base64.parse(encryptionKey);
+    
+    // Generate random IV (16 bytes)
+    const iv = CryptoJS.lib.WordArray.random(16);
+    
+    // Encrypt using AES-CBC with PKCS7 padding (CryptoJS default)
+    const encrypted = CryptoJS.AES.encrypt(data, keyBytes, {
+        iv: iv,
+        mode: CryptoJS.mode.CBC,
+        padding: CryptoJS.pad.Pkcs7
+    });
+    
+    // Combine IV + encrypted data
+    const combined = iv.concat(encrypted.ciphertext);
+    
+    // Return base64 encoded result (matching Python output)
+    return combined.toString(CryptoJS.enc.Base64);
+}
+
+function showEncryptionWarning(reason) {
+    $('#warning-reason').text(reason);
+    $('#encryption-warning').show();
+}
+
+function hideEncryptionWarning() {
+    $('#encryption-warning').hide();
+}
+
+function checkEncryptionStatus() {
+    // Check if CryptoJS is available
+    if (typeof CryptoJS === 'undefined') {
+        encryptionStatus.available = false;
+        encryptionStatus.reason = 'CryptoJS library failed to load. Using server-side encryption instead.';
+        reportEncryptionFailure(encryptionStatus.reason, 'cryptojs_missing');
+        return;
+    }
+    
+    // Check if encryption key is loaded
+    if (!encryptionKey) {
+        encryptionStatus.available = false;
+        encryptionStatus.reason = 'Encryption key not available. Using server-side encryption instead.';
+        reportEncryptionFailure(encryptionStatus.reason, 'key_unavailable');
+        return;
+    }
+    
+    encryptionStatus.available = true;
+    encryptionStatus.reason = null;
+}
+
+function reportEncryptionFailure(reason, failureType) {
+    $.ajax({
+        type: 'POST',
+        url: '/api/log_encryption_failure',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            'failure_reason': reason,
+            'failure_type': failureType
+        }),
+        error: function() {
+            console.warn('Failed to report encryption failure to server');
+        }
+    });
+}
+
 $(document).ready(function () {
+    // Load encryption key on page load
+    loadEncryptionKey().catch(function(error) {
+        console.error('Failed to load encryption key:', error);
+        showMessage('Failed to load encryption key', 'error');
+        
+        // Report encryption failure to server for logging
+        reportEncryptionFailure(encryptionStatus.reason || error.message, 'key_loading');
+    });
+
     // Initialize custom tabs
     $('.nav-tab').click(function() {
         const tabId = $(this).data('tab');
@@ -158,11 +277,13 @@ function refreshDeviceStatus() {
 
                     if (data.daemon_available) {
                         shutdownBtn.removeClass('btn-disabled').prop('disabled', false)
-                                  .attr('title', 'Shutdown this device');
+                                  .attr('title', 'Shutdown this device')
+                                  .attr('onclick', `shutdown_pc('${ip}')`);
                         daemonStatus.removeClass('unavailable').text('Shutdown daemon available');
                     } else {
                         shutdownBtn.addClass('btn-disabled').prop('disabled', true)
-                                  .attr('title', 'Shutdown daemon not detected');
+                                  .attr('title', 'Shutdown daemon not detected')
+                                  .removeAttr('onclick');
                         daemonStatus.addClass('unavailable').text('Shutdown daemon not detected');
                     }
                 }
@@ -283,6 +404,14 @@ function delete_pc(mac) {
 
 function shutdown_pc(ip) {
     $('#shutdownModal').show();
+    
+    // Check encryption status and show warning if needed
+    checkEncryptionStatus();
+    if (!encryptionStatus.available) {
+        showEncryptionWarning(encryptionStatus.reason);
+    } else {
+        hideEncryptionWarning();
+    }
 
     // Remove any existing click event listeners on the button
     $('#submitShutdown').off('click');
@@ -299,15 +428,27 @@ function shutdown_pc(ip) {
             showMessage('Password is required for shutdown.', 'error');
             return;
         }
-        $.ajax({
-            type: 'POST',
-            url: '/api/shutdown',
-            contentType: 'application/json',
-            data: JSON.stringify({
-                'username': username,
-                'pc_ip': ip,
-                'password': password
-            }),
+        // Check if end-to-end encryption is available
+        if (encryptionStatus.available) {
+            try {
+                // Create the JSON payload that matches Python format
+                const shutdownPayload = JSON.stringify({
+                    'username': username.strip ? username.strip() : username.trim(),
+                    'password': password.strip ? password.strip() : password.trim(),
+                    'action': 'shutdown'
+                });
+                
+                // Encrypt the payload using the hardware key
+                const encryptedPayload = encryptData(shutdownPayload);
+                
+                $.ajax({
+                    type: 'POST',
+                    url: '/api/shutdown',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        'pc_ip': ip,
+                        'encrypted_payload': encryptedPayload
+                    }),
             success: function (data) {
                 if (data.success) {
                     showMessage(data.message, 'success');
@@ -315,12 +456,55 @@ function shutdown_pc(ip) {
                     showMessage('Failed to send shutdown command: ' + data.message, 'error');
                 }
             },
-            error: function (xhr, status, error) {
-                console.log("Shutdown command failed. Status:", status, "Error:", error, "Response:", xhr.responseText);
-                showMessage('Error: ' + error, 'error');
-            },
-            dataType: 'json'
-        });
+                    error: function (xhr, status, error) {
+                        console.log("Shutdown command failed. Status:", status, "Error:", error, "Response:", xhr.responseText);
+                        showMessage('Error: ' + error, 'error');
+                    },
+                    dataType: 'json'
+                });
+            } catch (encryptionError) {
+                console.error('Client-side encryption failed:', encryptionError);
+                encryptionStatus.available = false;
+                encryptionStatus.reason = 'Client-side encryption failed: ' + encryptionError.message;
+                showEncryptionWarning(encryptionStatus.reason);
+                
+                // Report the encryption failure
+                reportEncryptionFailure(encryptionStatus.reason, 'encryption_failed');
+                
+                // Fall through to server-side encryption
+                sendServerSideEncryption();
+                return;
+            }
+        } else {
+            // Fallback to server-side encryption
+            sendServerSideEncryption();
+        }
+        
+        function sendServerSideEncryption() {
+            $.ajax({
+                type: 'POST',
+                url: '/api/shutdown',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    'pc_ip': ip,
+                    'username': username,
+                    'password': password,
+                    'fallback_reason': encryptionStatus.reason
+                }),
+                success: function (data) {
+                    if (data.success) {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage('Failed to send shutdown command: ' + data.message, 'error');
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.log("Shutdown command failed. Status:", status, "Error:", error, "Response:", xhr.responseText);
+                    showMessage('Error: ' + error, 'error');
+                },
+                dataType: 'json'
+            });
+        }
         $('#shutdownModal').hide();
     });
 }

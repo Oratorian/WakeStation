@@ -11,6 +11,7 @@
 import socket
 import threading
 import time
+import asyncio
 from typing import Dict, Any
 from ..core import sync_encryption_key
 from ..utils import get_daemon_logger
@@ -22,6 +23,7 @@ log = get_daemon_logger("daemon")
 server_running = False
 server_thread = None
 sync_thread = None
+
 
 
 def background_sync_worker(
@@ -65,6 +67,7 @@ def start_server(
     wol_server_ip: str,
     wol_server_port: int,
     dry_run: bool = False,
+    dry_run_state: dict = None,
 ):
     """Start the shutdown daemon server."""
     global server_running, sync_thread
@@ -98,9 +101,11 @@ def start_server(
                 log.debug(f"Connection from {address}")
 
                 # Handle client in a separate thread
+                # Use current dry-run state if available, otherwise fall back to initial value
+                current_dry_run = dry_run_state["enabled"] if dry_run_state else dry_run
                 client_thread = threading.Thread(
                     target=handle_client_connection,
-                    args=(client_socket, users, dry_run),
+                    args=(client_socket, users, current_dry_run),
                     daemon=True,
                 )
                 client_thread.start()
@@ -127,6 +132,7 @@ def start_server_thread(
     wol_server_ip: str,
     wol_server_port: int,
     dry_run: bool = False,
+    dry_run_state: dict = None,
 ):
     """Start server in a separate thread for GUI applications."""
     global server_thread
@@ -140,6 +146,7 @@ def start_server_thread(
             wol_server_ip,
             wol_server_port,
             dry_run,
+            dry_run_state,
         ),
         daemon=True,
     )

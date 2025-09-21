@@ -90,11 +90,12 @@ def main():
             if TRAY_AVAILABLE:
                 # Show setup dialog and wait for completion
                 users = initialize_users_dialog()
-                
+
                 # Ensure files are properly written before proceeding
                 import time
+
                 time.sleep(0.1)  # Brief pause to ensure file operations complete
-                
+
                 # Reload .env file after configuration is created
                 load_dotenv(override=True)
                 # Re-validate variables with new configuration
@@ -113,8 +114,10 @@ def main():
                     if args.bind_port
                     else int(os.getenv("BIND_PORT", "8080"))
                 )
-                
-                log.info("Configuration completed successfully, proceeding with server startup")
+
+                log.info(
+                    "Configuration completed successfully, proceeding with server startup"
+                )
             else:
                 # GUI not available - cannot do interactive setup
                 log.error("Setup required but GUI not available.")
@@ -150,6 +153,7 @@ def main():
                     WOL_SERVER_IP,
                     WOL_SERVER_PORT,
                     dry_run_state["enabled"],
+                    dry_run_state,
                 )
 
                 # Run tray (blocks until quit)
@@ -171,6 +175,7 @@ def main():
                 WOL_SERVER_IP,
                 WOL_SERVER_PORT,
                 dry_run_state["enabled"],
+                dry_run_state,
             )
         except KeyboardInterrupt:
             log.info("Shutdown daemon stopped.")

@@ -155,19 +155,64 @@ def setup_routes(app):
                 log.info(f"Authentication successful for user: {username}")
                 login_user(users, remember=remember)
                 if request.is_json:
-                    return jsonify({"message": "Login successful"}), 200
+                    return jsonify({"success": True, "message": "Login successful"}), 200
                 return redirect(url_for("index"))
             else:
                 log.warning(f"Authentication failed for user: {username}")
                 if request.is_json:
-                    return jsonify({"message": "Invalid credentials"}), 401
+                    return jsonify({"success": False, "message": "Invalid credentials"}), 401
                 return render_template("login.html", error="Invalid credentials")
 
         return render_template("login.html")
 
-    @app.route("/logout")
+    @app.route("/api/login", methods=["POST"])
+    def api_login():
+        """Dedicated login endpoint for API clients (Android app)"""
+        try:
+            if not request.is_json:
+                return jsonify({"success": False, "message": "Content-Type must be application/json"}), 400
+
+            data = request.get_json()
+            username = data.get("username")
+            password = data.get("password")
+            remember = data.get("remember", False)
+
+            if not username or not password:
+                return jsonify({"success": False, "message": "Username and password are required"}), 400
+
+            log.debug(f"API login attempt for user: {username}")
+
+            users = user.User.authenticate(username, password)
+            if users:
+                log.info(f"API authentication successful for user: {username}")
+                login_user(users, remember=remember)
+
+                # Update PC list with daemon IPs after successful login
+                update_pcs_with_daemon_ips(username)
+
+                response = jsonify({"success": True, "message": "Login successful"})
+                return response, 200
+            else:
+                log.warning(f"API authentication failed for user: {username}")
+                response = jsonify({"success": False, "message": "Invalid credentials"})
+                response.headers["Content-Length"] = str(len(response.get_data()))
+                return response, 401
+
+        except Exception as e:
+            log.error(f"API login exception: {e}")
+            response = jsonify({"success": False, "message": "Internal server error"})
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            return response, 500
+
+    @app.route("/logout", methods=["GET", "POST"])
     def logout():
         logout_user()
+
+        # Check if this is an API request (Accept: application/json)
+        if request.headers.get('Accept') == 'application/json':
+            return jsonify({"success": True, "message": "Logged out successfully"})
+
+        # For web UI, redirect to login page
         return redirect(url_for("login"))
 
     @app.route("/")
@@ -486,10 +531,34 @@ def setup_routes(app):
                     400,
                 )
 
-            username = data.get("username")
-            password = data.get("password")
+            # Check if we received an encrypted payload (new method)
+            encrypted_payload = data.get("encrypted_payload")
+            if encrypted_payload:
+                # Pass encrypted payload directly to daemon (end-to-end encryption)
+                log.info(f"Shutdown request for {pc_ip}: Using end-to-end encryption")
+                result = workers.send_encrypted_shutdown_command(
+                    pc_ip, encrypted_payload
+                )
+            else:
+                # Legacy method: encrypt on server side
+                username = data.get("username")
+                password = data.get("password")
+                fallback_reason = data.get("fallback_reason")
 
-            result = workers.send_shutdown_command(pc_ip, username, password)
+                if fallback_reason:
+                    log.critical(
+                        f"Shutdown request for {pc_ip}: End-to-end encryption failed - {fallback_reason}"
+                    )
+                    log.info(
+                        f"Shutdown request for {pc_ip}: Falling back to server-side encryption"
+                    )
+                else:
+                    log.info(
+                        f"Shutdown request for {pc_ip}: Using server-side encryption (legacy)"
+                    )
+
+                result = workers.send_shutdown_command(pc_ip, username, password)
+
             status_code = (
                 200
                 if result["success"]
@@ -674,6 +743,41 @@ def setup_routes(app):
                 )
         except Exception as e:
             log.error(f"Error changing password: {e}")
+            return jsonify({"success": False, "message": "Internal server error"}), 500
+
+    @app.route("/api/get_encryption_key", methods=["GET"])
+    @login_required
+    def get_encryption_key():
+        """Serve encryption key to authenticated browser clients"""
+        try:
+            encryption_key = user.User.load_key()
+            encryption_key_encoded = base64.b64encode(encryption_key).decode("utf-8")
+
+            return (
+                jsonify({"success": True, "encryption_key": encryption_key_encoded}),
+                200,
+            )
+
+        except Exception as e:
+            log.error(f"Error serving encryption key to browser: {str(e)}")
+            return jsonify({"success": False, "message": "Internal server error"}), 500
+
+    @app.route("/api/log_encryption_failure", methods=["POST"])
+    @login_required
+    def log_encryption_failure():
+        """Log encryption failures reported by browser clients"""
+        try:
+            data = request.get_json()
+            failure_reason = data.get("failure_reason", "Unknown failure")
+            failure_type = data.get("failure_type", "unknown")
+
+            log.critical(
+                f"Browser encryption failure ({failure_type}): {failure_reason}"
+            )
+            return jsonify({"success": True}), 200
+
+        except Exception as e:
+            log.error(f"Error logging encryption failure: {str(e)}")
             return jsonify({"success": False, "message": "Internal server error"}), 500
 
     @app.route("/api/sync_encryption_key", methods=["POST"])

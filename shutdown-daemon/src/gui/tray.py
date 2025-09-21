@@ -195,6 +195,7 @@ def restart_daemon(dry_run_state) -> None:
             WOL_SERVER_IP,
             WOL_SERVER_PORT,
             dry_run_state["enabled"],
+            dry_run_state,
         )
 
         log.info("Daemon restarted successfully.")

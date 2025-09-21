@@ -1,5 +1,27 @@
 # Changelog
 
+## 🚀 [v2.9.3] - 22-September-2025
+**Summary:** Critical fixes for WebUI responsiveness and daemon state management discovered during Android app development.
+
+### 🐛 Fixed
+- 🖱️ **Fixed WebUI shutdown button not working after daemon activation** - Resolved issue where shutdown buttons became clickable when daemon went online but were non-functional until page refresh:
+  - Added dynamic `onclick` handler assignment in `refreshDeviceStatus()` function
+  - Buttons now properly gain functionality when daemon becomes available without requiring page refresh
+  - Enhanced user experience with immediate button responsiveness
+- 🔄 **Fixed dry-run state persistence across daemon restarts** - Resolved critical issue where dry-run mode setting was lost when restarting daemon via tray icon:
+  - Added missing `dry_run_state` parameter to `start_server_thread` call in `restart_daemon()` function
+  - Dry-run toggle state now properly maintained across daemon restart operations
+  - Fixed state synchronization between tray icon and daemon server
+- 🔄 **Enhanced JavaScript cache management** - Bumped wol.js cache buster version from v7 to v8 to ensure immediate deployment of fixes
+
+### 🔧 Technical Details
+- **Root Cause Analysis**: Android app development served as comprehensive integration testing, exposing edge cases not caught by standard web UI testing
+- **State Management**: Fixed daemon restart process to properly pass both boolean value and state dictionary reference
+- **DOM Manipulation**: Enhanced dynamic UI updates to handle real-time daemon status changes without page refreshes
+- **Cross-Platform Testing**: Issues discovered through mobile HTTP client behavior differences (OkHttp vs browser behavior)
+
+---
+
 ## 🚀 [v2.9.2] - 11-September-2025
 **Summary:** Critical network discovery and configuration bug fixes for multi-NIC systems and shutdown daemon reliability.
 

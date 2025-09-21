@@ -16,6 +16,7 @@ import base64
 import requests
 import uuid
 import time
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -62,6 +63,7 @@ def get_mac_address(bind_ip: str = None) -> Optional[str]:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if system == "windows" else 0
             )
             if result.returncode == 0 and result.stdout.strip():
                 mac_raw = result.stdout.strip()
@@ -218,23 +220,24 @@ def sync_encryption_key(
     # Get MAC address in background to avoid blocking startup
     daemon_mac = None
     try:
-        # Quick MAC detection with short timeout for GUI mode
-        if getattr(sys, "frozen", False):
-            # In GUI mode, use faster method or skip MAC detection
-            import uuid
+        # Determine the actual IP address used to communicate with the WakeStation server
+        # This is the real interface we need the MAC address for
+        actual_ip = get_local_ip(wol_server_ip, wol_server_port)
 
-            mac_int = uuid.getnode()
-            if (
-                mac_int != uuid.getnode()
-            ):  # If getnode() returns different values, it failed
+        if actual_ip:
+            log.debug(f"Detected actual interface IP: {actual_ip}")
+            # Get MAC address for the actual interface being used (with no console window)
+            try:
+                daemon_mac = get_mac_address(actual_ip)
+                log.debug(f"Detected MAC address: {daemon_mac}")
+            except Exception as mac_error:
+                log.warning(f"MAC detection failed: {mac_error}")
                 daemon_mac = None
-            else:
-                mac_hex = f"{mac_int:012x}"
-                daemon_mac = ":".join([mac_hex[i : i + 2] for i in range(0, 12, 2)])
         else:
-            # In console mode, use full detection
-            daemon_mac = get_mac_address(bind_ip)
-    except Exception:
+            log.warning("Could not determine actual interface IP")
+            daemon_mac = None
+    except Exception as e:
+        log.warning(f"MAC address detection failed: {e}")
         daemon_mac = None
 
     # Prepare request headers (no HMAC needed for key exchange)

@@ -69,3 +69,40 @@ def send_shutdown_command(pc_ip, username, password):
     except Exception as e:
         log.error(f"Exception sending shutdown command to {pc_ip}: {e}")
         return {"success": False, "message": "Internal server error"}
+
+
+def send_encrypted_shutdown_command(pc_ip, encrypted_payload):
+    """Send pre-encrypted shutdown command to remote PC via daemon"""
+    try:
+        log.debug(
+            f"Sending pre-encrypted shutdown command to {pc_ip}:{config.SHUTDOWN_DAEMON_PORT}"
+        )
+
+        # Send the already encrypted data directly to nc via stdin
+        result = subprocess.run(
+            ["nc", pc_ip, str(config.SHUTDOWN_DAEMON_PORT)],
+            input=encrypted_payload + "\n",  # Add newline for proper transmission
+            capture_output=True,
+            text=True,
+            timeout=10,  # Add timeout to prevent hanging
+        )
+
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            log.debug(f"Shutdown daemon response from {pc_ip}: {output}")
+
+            if "Error" in output or "Invalid" in output:
+                log.warning(f"Shutdown command failed for {pc_ip}: {output}")
+                return {"success": False, "message": output}
+
+            log.info(f"Pre-encrypted shutdown command sent successfully to {pc_ip}")
+            return {"success": True, "message": output}
+        else:
+            log.error(f"Shutdown command failed for {pc_ip}: {result.stderr}")
+            return {
+                "success": False,
+                "message": f"Failed to send shutdown command: {result.stderr}",
+            }
+    except Exception as e:
+        log.error(f"Exception sending pre-encrypted shutdown command to {pc_ip}: {e}")
+        return {"success": False, "message": "Internal server error"}

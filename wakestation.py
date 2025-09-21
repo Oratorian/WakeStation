@@ -58,6 +58,20 @@ def load_user(user_id):
     return user.User.get(user_id)
 
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Handle unauthorized access - return JSON for API requests, HTML for others"""
+    from flask import request, jsonify, redirect, url_for
+
+    # Check if this is an API request (Accept header or URL path)
+    if (request.headers.get('Accept') == 'application/json' or
+        request.path.startswith('/api/')):
+        return jsonify({"success": False, "message": "Authentication required"}), 401
+    else:
+        # Regular web request - redirect to login
+        return redirect(url_for('login'))
+
+
 # Setup all API routes
 api.setup_routes(app)
 
