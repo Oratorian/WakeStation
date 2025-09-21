@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![WakeStation](https://img.shields.io/badge/WakeStation-v2.9.2-00ff88?style=for-the-badge&logo=wifi&logoColor=white)
+![WakeStation](https://img.shields.io/badge/WakeStation-v2.9.3-00ff88?style=for-the-badge&logo=wifi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-0099ff?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge&logo=gnu&logoColor=white)
 ![Build Status](https://img.shields.io/github/actions/workflow/status/Oratorian/WakeStation/release.yml?style=for-the-badge&logo=github&logoColor=white&label=Build)
