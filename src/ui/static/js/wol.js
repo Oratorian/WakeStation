@@ -12,7 +12,7 @@ function loadEncryptionKey() {
             resolve(encryptionKey);
             return;
         }
-        
+
         $.ajax({
             type: 'GET',
             url: '/api/get_encryption_key',
@@ -42,23 +42,23 @@ function encryptData(data) {
     if (!encryptionKey) {
         throw new Error('Encryption key not loaded');
     }
-    
+
     // Convert base64 key to WordArray
     const keyBytes = CryptoJS.enc.Base64.parse(encryptionKey);
-    
+
     // Generate random IV (16 bytes)
     const iv = CryptoJS.lib.WordArray.random(16);
-    
+
     // Encrypt using AES-CBC with PKCS7 padding (CryptoJS default)
     const encrypted = CryptoJS.AES.encrypt(data, keyBytes, {
         iv: iv,
         mode: CryptoJS.mode.CBC,
         padding: CryptoJS.pad.Pkcs7
     });
-    
+
     // Combine IV + encrypted data
     const combined = iv.concat(encrypted.ciphertext);
-    
+
     // Return base64 encoded result (matching Python output)
     return combined.toString(CryptoJS.enc.Base64);
 }
@@ -72,6 +72,50 @@ function hideEncryptionWarning() {
     $('#encryption-warning').hide();
 }
 
+// IP address validation function
+function isValidIP(ip) {
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return ipRegex.test(ip);
+}
+
+// Edit IP address function
+function editIP(mac, currentIP) {
+    const newIP = prompt(`Enter new IP address for device with MAC ${mac}:`, currentIP);
+
+    if (newIP === null) {
+        return; // User cancelled
+    }
+
+    // Allow empty IP (to clear it)
+    if (newIP !== '' && !isValidIP(newIP)) {
+        showMessage('Invalid IP address format. Use format: 192.168.1.100', 'error');
+        return;
+    }
+
+    $.ajax({
+        type: 'POST',
+        url: '/api/edit_ip',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            'mac': mac,
+            'ip': newIP
+        }),
+        success: function(data) {
+            if (data.success) {
+                showMessage(data.message, 'success');
+                load_pcs(); // Reload the PC list
+            } else {
+                showMessage(data.message, 'error');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.log('Error updating IP:', status, error);
+            showMessage('Failed to update IP address. Please try again.', 'error');
+        },
+        dataType: 'json'
+    });
+}
+
 function checkEncryptionStatus() {
     // Check if CryptoJS is available
     if (typeof CryptoJS === 'undefined') {
@@ -80,7 +124,7 @@ function checkEncryptionStatus() {
         reportEncryptionFailure(encryptionStatus.reason, 'cryptojs_missing');
         return;
     }
-    
+
     // Check if encryption key is loaded
     if (!encryptionKey) {
         encryptionStatus.available = false;
@@ -88,7 +132,7 @@ function checkEncryptionStatus() {
         reportEncryptionFailure(encryptionStatus.reason, 'key_unavailable');
         return;
     }
-    
+
     encryptionStatus.available = true;
     encryptionStatus.reason = null;
 }
@@ -108,12 +152,25 @@ function reportEncryptionFailure(reason, failureType) {
     });
 }
 
+// Global AJAX error handler for 401 responses (invalid/expired tokens)
+$(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+    if (jqxhr.status === 401) {
+        console.log('Session expired or invalid. Redirecting to login...');
+        // Clear any stored tokens/session
+        document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        // Redirect to login
+        window.location.href = '/ui/login';
+    }
+});
+
 $(document).ready(function () {
     // Load encryption key on page load
     loadEncryptionKey().catch(function(error) {
         console.error('Failed to load encryption key:', error);
         showMessage('Failed to load encryption key', 'error');
-        
+
         // Report encryption failure to server for logging
         reportEncryptionFailure(encryptionStatus.reason || error.message, 'key_loading');
     });
@@ -154,13 +211,14 @@ $(document).ready(function () {
     $('#logout-button').click(function () {
         $.ajax({
             type: 'GET',
-            url: '/logout',
+            url: '/ui/logout',
             success: function () {
-                window.location.href = '/login';
+                window.location.href = '/ui/login';
             },
             error: function (xhr, status, error) {
                 console.log("Logout failed", "status:", status, "error:", error);
-                showMessage('Failed to log out. Please try again.', 'error');
+                // Even if logout fails, redirect to login
+                window.location.href = '/ui/login';
             }
         });
     });
@@ -204,6 +262,7 @@ $(document).ready(function () {
         event.preventDefault();
         const mac = $('#mac').val();
         const hostname = $('#hostname').val();
+        const ip = $('#ip').val() || '';  // IP is optional
 
         // Validate MAC address format
         const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
@@ -211,9 +270,17 @@ $(document).ready(function () {
             showMessage('Invalid MAC address format. Use format: AA:BB:CC:DD:EE:FF', 'error');
             return;
         }
+
+        // Validate IP format if provided
+        if (ip && !isValidIP(ip)) {
+            showMessage('Invalid IP address format. Use format: 192.168.1.100', 'error');
+            return;
+        }
+
         const dataToSend = JSON.stringify({
             'mac': mac,
-            'hostname': hostname
+            'hostname': hostname,
+            'ip': ip
         });
         $.ajax({
             type: 'POST',
@@ -228,6 +295,7 @@ $(document).ready(function () {
                     showMessage(data.message, 'success');
                     $('#mac').val('');
                     $('#hostname').val('');
+                    $('#ip').val('');
                 } else {
                     showMessage(data.message, 'error');
                 }
@@ -255,18 +323,21 @@ setInterval(function() {
 function refreshDeviceStatus() {
     $('.pc-card').each(function() {
         const card = $(this);
-        const ip = card.find('.pc-details div:first').text().replace('IP: ', '');
+        const daemonGuid = card.data('daemon-guid');
         const statusDot = card.find('.pc-status');
 
-        // Skip status check if IP is not resolved
-        if (!ip || ip === 'Not resolved' || ip === '') {
-            statusDot.removeClass('online offline unknown').addClass('unknown');
+        // Use IP for status checking if available
+        const ip = card.find('.ip-display').text();
+
+        // Skip status check if no IP is set
+        if (!ip || ip === 'Not set') {
+            statusDot.removeClass('online offline unknown no-ip').addClass('no-ip');
             return;
         }
 
         $.ajax({
             type: 'GET',
-            url: '/api/status?ip=' + ip,
+            url: '/api/status?ip=' + encodeURIComponent(ip),
             success: function(data) {
                 if (data.success) {
                     statusDot.removeClass('online offline unknown').addClass(data.status);
@@ -278,7 +349,7 @@ function refreshDeviceStatus() {
                     if (data.daemon_available) {
                         shutdownBtn.removeClass('btn-disabled').prop('disabled', false)
                                   .attr('title', 'Shutdown this device')
-                                  .attr('onclick', `shutdown_pc('${ip}')`);
+                                  .attr('onclick', `shutdown_pc('${daemonGuid}')`);
                         daemonStatus.removeClass('unavailable').text('Shutdown daemon available');
                     } else {
                         shutdownBtn.addClass('btn-disabled').prop('disabled', true)
@@ -295,33 +366,73 @@ function refreshDeviceStatus() {
     });
 }
 
+// Rediscover IPs for all devices
+function rediscoverAllIPs() {
+    if (confirm('Scan network for all device IP addresses? This may take a few seconds.')) {
+        // Show loading state
+        const button = $('#rediscover-btn');
+        const originalText = button.text();
+        button.prop('disabled', true).text('🔍 Scanning...');
+
+        $.ajax({
+            type: 'POST',
+            url: '/api/rediscover_ips',
+            contentType: 'application/json',
+            success: function(data) {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // Reload the devices list to show updated IPs
+                    load_pcs();
+                } else {
+                    showMessage('Failed to rediscover IPs: ' + data.message, 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                showMessage('Error during IP rediscovery: ' + error, 'error');
+            },
+            complete: function() {
+                // Restore button state
+                button.prop('disabled', false).text(originalText);
+            },
+            dataType: 'json'
+        });
+    }
+}
+
 // Load PCs function
 function load_pcs() {
-
-    // Show loading indicator
-    showDeviceLoadingMessage();
-
     $.ajax({
         type: 'GET',
         url: '/api/load',
         beforeSend: function() {
         },
         success: function (data) {
-            hideDeviceLoadingMessage();
             if (data.success) {
                 if (data.pcs_list.length === 0) {
                     $('#pcs-list').html('');
                     $('#empty-devices').show();
                 } else {
                     $('#empty-devices').hide();
-                    $('#pcs-list').html(data.pcs_list.map(pc => `
-                        <div class="pc-card">
-                            <div class="pc-status ${pc.status || 'unknown'}"></div>
+                    $('#pcs-list').html(data.pcs_list.map(pc => {
+                        const statusText = pc.status === 'no_ip' ? 'No IP Set' :
+                                         pc.status === 'online' ? 'Online' :
+                                         pc.status === 'offline' ? 'Offline' : 'Unknown';
+                        const statusClass = pc.status === 'no_ip' ? 'no-ip' : pc.status || 'unknown';
+
+                        return `
+                        <div class="pc-card" data-daemon-guid="${pc.daemon_guid || ''}">
+                            <div class="pc-status ${statusClass}"></div>
                             <div class="pc-info">
                                 <h3 class="pc-hostname">${pc.hostname || 'Unknown'}</h3>
                                 <div class="pc-details">
-                                    <div>IP: ${pc.ip || 'Not resolved'}</div>
+                                    <div>Status: ${statusText}</div>
+                                    <div>IP: <span class="ip-display">${pc.ip || 'Not set'}</span>
+                                        <button class="btn btn-tiny" onclick="editIP('${pc.mac}', '${pc.ip || ''}')" title="Edit IP Address" style="margin-left: 0.25rem; padding: 0.2rem;">
+                                            <i class="material-icons-outlined" style="font-size: 0.9rem;">edit</i>
+                                        </button>
+                                    </div>
                                     <div>MAC: ${pc.mac || 'Unknown'}</div>
+                                    <div class="daemon-guid-info" title="Daemon GUID: ${pc.daemon_guid || 'None'}">GUID: ${pc.daemon_guid ? pc.daemon_guid.substring(0, 8) + '...' : 'None'}</div>
                                 </div>
                             </div>
                             <div class="pc-actions">
@@ -330,7 +441,7 @@ function load_pcs() {
                                     Wake
                                 </button>
                                 <button class="btn btn-small btn-secondary ${pc.daemon_available ? '' : 'btn-disabled'}"
-                                        ${pc.daemon_available ? `onclick="shutdown_pc('${pc.ip}')"` : 'disabled'}
+                                        ${pc.daemon_available ? `onclick="shutdown_pc('${pc.daemon_guid}')"` : 'disabled'}
                                         title="${pc.daemon_available ? 'Shutdown this device' : 'Shutdown daemon not detected'}">
                                     <i class="material-icons-outlined">power_off</i>
                                     Shutdown
@@ -343,8 +454,8 @@ function load_pcs() {
                                     ${pc.daemon_available ? 'Shutdown daemon available' : 'Shutdown daemon not detected'}
                                 </div>
                             </div>
-                        </div>
-                    `).join(''));
+                        </div>`;
+                    }).join(''));
                 }
             } else {
                 showMessage(data.message, 'error');
@@ -354,7 +465,6 @@ function load_pcs() {
             console.log("Error loading PC list", "status:", status, "error:", error);
             console.log("Response text:", xhr.responseText);
             console.log("Status code:", xhr.status);
-            hideDeviceLoadingMessage();
             showMessage('Failed to load PC list. Please try again.', 'error');
         },
         dataType: 'json'
@@ -364,7 +474,7 @@ function load_pcs() {
 // Wake PC function
 function wake_pc(mac) {
     $.ajax({
-        type: 'GET',
+        type: 'POST',
         url: '/api/wake?mac=' + mac,
         success: function (data) {
             if (data.success) {
@@ -402,9 +512,9 @@ function delete_pc(mac) {
     });
 }
 
-function shutdown_pc(ip) {
+function shutdown_pc(daemon_guid) {
     $('#shutdownModal').show();
-    
+
     // Check encryption status and show warning if needed
     checkEncryptionStatus();
     if (!encryptionStatus.available) {
@@ -437,16 +547,16 @@ function shutdown_pc(ip) {
                     'password': password.strip ? password.strip() : password.trim(),
                     'action': 'shutdown'
                 });
-                
+
                 // Encrypt the payload using the hardware key
                 const encryptedPayload = encryptData(shutdownPayload);
-                
+
                 $.ajax({
                     type: 'POST',
                     url: '/api/shutdown',
                     contentType: 'application/json',
                     data: JSON.stringify({
-                        'pc_ip': ip,
+                        'daemon_guid': daemon_guid,
                         'encrypted_payload': encryptedPayload
                     }),
             success: function (data) {
@@ -467,10 +577,10 @@ function shutdown_pc(ip) {
                 encryptionStatus.available = false;
                 encryptionStatus.reason = 'Client-side encryption failed: ' + encryptionError.message;
                 showEncryptionWarning(encryptionStatus.reason);
-                
+
                 // Report the encryption failure
                 reportEncryptionFailure(encryptionStatus.reason, 'encryption_failed');
-                
+
                 // Fall through to server-side encryption
                 sendServerSideEncryption();
                 return;
@@ -479,14 +589,14 @@ function shutdown_pc(ip) {
             // Fallback to server-side encryption
             sendServerSideEncryption();
         }
-        
+
         function sendServerSideEncryption() {
             $.ajax({
                 type: 'POST',
                 url: '/api/shutdown',
                 contentType: 'application/json',
                 data: JSON.stringify({
-                    'pc_ip': ip,
+                    'daemon_guid': daemon_guid,
                     'username': username,
                     'password': password,
                     'fallback_reason': encryptionStatus.reason
@@ -706,93 +816,3 @@ function showMessage(message, type = 'info') {
     }, 4000);
 }
 
-// Device loading indicator with fake progress bar
-function showDeviceLoadingMessage() {
-    // Hide existing content
-    $('#pcs-list').hide();
-    $('#empty-devices').hide();
-
-    // Show loading message with progress bar
-    const loadingHtml = `
-        <div id="device-loading" class="loading-container">
-            <div class="loading-content">
-                <div class="loading-spinner"></div>
-                <h3>Detecting Device Status</h3>
-                <p>Scanning network for devices...</p>
-                <div class="progress-bar-container">
-                    <div class="progress-bar" id="fake-progress"></div>
-                </div>
-                <div class="progress-text">
-                    <span id="progress-stage">Initializing scan...</span>
-                    <span id="progress-percent">0%</span>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Insert loading indicator right after the "Network Devices" title, but before pcs-list
-    $('#pcs-list').before(loadingHtml);
-
-    // Start fake progress animation
-    startFakeProgress();
-}
-
-function hideDeviceLoadingMessage() {
-    $('#device-loading').remove();
-    $('#pcs-list').show();
-    // Stop any running progress intervals
-    if (window.fakeProgressInterval) {
-        clearInterval(window.fakeProgressInterval);
-    }
-}
-
-function startFakeProgress() {
-    let progress = 0;
-    const stages = [
-        "Initializing scan...",
-        "Detecting network interfaces...",
-        "Running ARP scan...",
-        "Resolving device addresses...",
-        "Checking daemon availability...",
-        "Finalizing results..."
-    ];
-    let currentStage = 0;
-
-    window.fakeProgressInterval = setInterval(() => {
-        // Increment progress (faster at start, slower at end)
-        if (progress < 30) {
-            progress += Math.random() * 8 + 2; // 2-10% jumps
-        } else if (progress < 70) {
-            progress += Math.random() * 5 + 1; // 1-6% jumps
-        } else if (progress < 90) {
-            progress += Math.random() * 2 + 0.5; // 0.5-2.5% jumps
-        } else {
-            progress += Math.random() * 0.5; // Very slow near end
-        }
-
-        // Cap at 95% until real completion
-        progress = Math.min(progress, 95);
-
-        // Update progress bar
-        $('#fake-progress').css('width', progress + '%');
-        $('#progress-percent').text(Math.floor(progress) + '%');
-
-        // Update stage text
-        const targetStage = Math.floor((progress / 100) * stages.length);
-        if (targetStage > currentStage && targetStage < stages.length) {
-            currentStage = targetStage;
-            $('#progress-stage').text(stages[currentStage]);
-        }
-
-        // If we've reached 95%, slow down the interval
-        if (progress >= 95) {
-            clearInterval(window.fakeProgressInterval);
-            // Very slow trickle to 98%
-            window.fakeProgressInterval = setInterval(() => {
-                progress = Math.min(progress + 0.1, 98);
-                $('#fake-progress').css('width', progress + '%');
-                $('#progress-percent').text(Math.floor(progress) + '%');
-            }, 500);
-        }
-    }, 150); // Update every 150ms
-}

@@ -11,20 +11,48 @@
 import socket
 import sys
 import os
+import re
 
 # Add parent directories to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import config
-from ..logger import logger
-from .network import get_wol_interface, normalize_mac_address, validate_mac_address
+from src import logger_config as logger
 
-log = logger.get_logger("wol")
+# Import normalize function only (validate is deprecated)
+from .network import normalize_mac_address
+
+log = logger.get_logger("WakeStation-WOL")
+
+
+def validate_mac_for_wol(mac_address):
+    """
+    Validate MAC address format for Wake-on-LAN.
+    Accepts: XX:XX:XX:XX:XX:XX, XX-XX-XX-XX-XX-XX, or XXXXXXXXXXXX
+
+    Args:
+        mac_address (str): MAC address to validate
+
+    Returns:
+        bool: True if valid MAC format, False otherwise
+    """
+    if not mac_address:
+        return False
+
+    # Remove common separators and check if we have 12 hex characters
+    clean_mac = mac_address.replace(":", "").replace("-", "").upper()
+
+    # Must be exactly 12 hexadecimal characters
+    if len(clean_mac) != 12:
+        return False
+
+    # All characters must be valid hex
+    return all(c in "0123456789ABCDEF" for c in clean_mac)
 
 
 def send_wol_packet(mac_address, broadcast_ip="255.255.255.255", port=9):
     """
     Send Wake-on-LAN magic packet using Python socket library.
-    Uses config.WOL_INTERFACE as the sending interface.
+    Uses config.WOL_SERVER_HOST as the sending interface.
 
     Args:
         mac_address (str): MAC address in format AA:BB:CC:DD:EE:FF or AA-BB-CC-DD-EE-FF
@@ -35,12 +63,16 @@ def send_wol_packet(mac_address, broadcast_ip="255.255.255.255", port=9):
         bool: True if packet was sent successfully, False otherwise
     """
     try:
-        # Get and validate WOL interface
-        interface_ip = get_wol_interface()
-        log.debug(f"Using WOL interface: {interface_ip}")
+        # Get WOL server host from config
+        interface_ip = getattr(config, "WOL_SERVER_HOST", None)
+        if not interface_ip:
+            # Fallback to legacy WOL_INTERFACE for backward compatibility
+            interface_ip = getattr(config, "WOL_INTERFACE", "0.0.0.0")
 
-        # Normalize and validate MAC address
-        if not validate_mac_address(mac_address):
+        log.debug(f"Using WOL server host: {interface_ip}")
+
+        # Validate and normalize MAC address
+        if not validate_mac_for_wol(mac_address):
             raise ValueError(f"Invalid MAC address format: {mac_address}")
 
         normalized_mac = normalize_mac_address(mac_address)
@@ -92,15 +124,16 @@ def wake_device(mac_address, broadcast_ip=None):
     try:
         # Auto-detect broadcast if not specified
         if not broadcast_ip:
-            from .network import get_local_network
-
-            network = get_local_network()
-            if network:
-                # Convert 10.0.1.0/24 to 10.0.1.255
-                network_base = network.split("/")[0]  # Get 10.0.1.0
-                parts = network_base.split(".")
-                parts[3] = "255"  # Make it 10.0.1.255
-                broadcast_ip = ".".join(parts)
+            # Simple broadcast detection based on server host
+            server_host = getattr(config, "WOL_SERVER_HOST", None)
+            if server_host and server_host != "0.0.0.0":
+                # Convert 10.0.1.13 to 10.0.1.255
+                parts = server_host.split(".")
+                if len(parts) == 4:
+                    parts[3] = "255"  # Make it 10.0.1.255
+                    broadcast_ip = ".".join(parts)
+                else:
+                    broadcast_ip = "255.255.255.255"
             else:
                 broadcast_ip = "255.255.255.255"
 

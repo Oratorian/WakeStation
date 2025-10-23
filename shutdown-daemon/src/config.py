@@ -26,6 +26,7 @@ APP_DATA_PATH = os.path.join(os.path.expanduser("~"), ".wakestation")
 USERS_FILE_PATH = os.path.join(APP_DATA_PATH, "users.json")
 LOG_FILE_PATH = os.path.join(APP_DATA_PATH, "daemon.log")
 PID_FILE = os.path.join(APP_DATA_PATH, "daemon.pid")
+DAEMON_GUID_FILE = os.path.join(APP_DATA_PATH, "daemon_guid.txt")
 
 # Ensure directories exist
 os.makedirs(APP_DATA_PATH, exist_ok=True)

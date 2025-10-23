@@ -25,7 +25,6 @@ server_thread = None
 sync_thread = None
 
 
-
 def background_sync_worker(
     wol_server_ip: str,
     wol_server_port: int,

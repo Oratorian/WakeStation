@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- WakeStation Cyberpunk Theme - Matching Web UI -->
+    <style name="Base.Theme.WakeStation" parent="Theme.Material3.Dark">
+        <!-- Primary Colors -->
+        <item name="colorPrimary">@color/accent_primary</item>
+        <item name="colorOnPrimary">@color/bg_primary</item>
+        <item name="colorPrimaryContainer">@color/bg_secondary</item>
+        <item name="colorOnPrimaryContainer">@color/accent_primary</item>
+
+        <!-- Secondary Colors -->
+        <item name="colorSecondary">@color/accent_secondary</item>
+        <item name="colorOnSecondary">@color/bg_primary</item>
+        <item name="colorSecondaryContainer">@color/bg_tertiary</item>
+        <item name="colorOnSecondaryContainer">@color/accent_secondary</item>
+
+        <!-- Background and Surface -->
+        <item name="android:colorBackground">@color/bg_primary</item>
+        <item name="colorOnBackground">@color/text_primary</item>
+        <item name="colorSurface">@color/bg_secondary</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/bg_tertiary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+
+        <!-- Error Colors -->
+        <item name="colorError">@color/danger</item>
+        <item name="colorOnError">@color/text_primary</item>
+        <item name="colorErrorContainer">@color/bg_tertiary</item>
+        <item name="colorOnErrorContainer">@color/danger</item>
+
+        <!-- Outline and Border -->
+        <item name="colorOutline">@color/border_color</item>
+        <item name="colorOutlineVariant">@color/text_muted</item>
+
+        <!-- Status bar and navigation -->
+        <item name="android:statusBarColor">@color/bg_primary</item>
+        <item name="android:navigationBarColor">@color/bg_primary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="Theme.WakeStation" parent="Base.Theme.WakeStation" />
+
+    <style name="Theme.WakeStation.NoActionBar" parent="Theme.WakeStation">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- Fallback colors for Material 3 -->
+    <color name="md_theme_light_primary">#1976D2</color>
+    <color name="md_theme_light_onPrimary">#FFFFFF</color>
+    <color name="md_theme_light_primaryContainer">#BBDEFB</color>
+    <color name="md_theme_light_onPrimaryContainer">#0D47A1</color>
+    <color name="md_theme_light_secondary">#4CAF50</color>
+    <color name="md_theme_light_onSecondary">#FFFFFF</color>
+    <color name="md_theme_light_secondaryContainer">#C8E6C9</color>
+    <color name="md_theme_light_onSecondaryContainer">#2E7D32</color>
+    <color name="md_theme_light_tertiary">#FF9800</color>
+    <color name="md_theme_light_onTertiary">#FFFFFF</color>
+    <color name="md_theme_light_tertiaryContainer">#FFE0B2</color>
+    <color name="md_theme_light_onTertiaryContainer">#E65100</color>
+    <color name="md_theme_light_error">#F44336</color>
+    <color name="md_theme_light_errorContainer">#FFCDD2</color>
+    <color name="md_theme_light_onError">#FFFFFF</color>
+    <color name="md_theme_light_onErrorContainer">#C62828</color>
+    <color name="md_theme_light_background">#FAFAFA</color>
+    <color name="md_theme_light_onBackground">#212121</color>
+    <color name="md_theme_light_surface">#FFFFFF</color>
+    <color name="md_theme_light_onSurface">#212121</color>
+    <color name="md_theme_light_surfaceVariant">#F5F5F5</color>
+    <color name="md_theme_light_onSurfaceVariant">#424242</color>
+    <color name="md_theme_light_outline">#9E9E9E</color>
+    <color name="md_theme_light_outlineVariant">#E0E0E0</color>
+    <color name="md_theme_light_inverseSurface">#303030</color>
+    <color name="md_theme_light_inverseOnSurface">#FAFAFA</color>
+    <color name="md_theme_light_inversePrimary">#42A5F5</color>
+</resources>

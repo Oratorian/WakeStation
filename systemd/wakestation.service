@@ -1,0 +1,35 @@
+[Unit]
+Description=WakeStation v3.0+ - Wake-on-LAN Command Center (FastAPI + Uvicorn)
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+# CAP_NET_BIND_SERVICE: Bind to privileged ports (80, 443)
+# CAP_SETFCAP: Grant capabilities to arp-scan
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SETFCAP
+WorkingDirectory=/opt/wol
+
+# Grant arp-scan capabilities before starting
+ExecStartPre=/usr/sbin/setcap cap_net_raw+ep /usr/sbin/arp-scan
+
+# Start WakeStation (port and SSL configured in config.py)
+# IMPORTANT: Update this path to match your Python installation:
+#   - Virtual environment: /opt/wol/.venv/bin/python wakestation.py
+#   - System-wide Python: /usr/bin/python3 wakestation.py
+# Note: wakestation.py automatically starts uvicorn - config.py controls all settings
+ExecStart=/opt/wol/.venv/bin/python wakestation.py
+
+# Remove arp-scan capabilities on stop
+ExecStop=/usr/sbin/setcap cap_net_raw-ep /usr/sbin/arp-scan
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

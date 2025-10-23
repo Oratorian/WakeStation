@@ -1,0 +1,160 @@
+package com.wakestation.android.network
+
+import android.content.Context
+import com.wakestation.android.data.model.*
+import com.wakestation.android.utils.PreferenceManager
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
+import okhttp3.OkHttpClient
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOException
+import retrofit2.http.*
+import java.util.concurrent.TimeUnit
+
+interface ApiService {
+
+    @POST("login")
+    @FormUrlEncoded
+    suspend fun login(
+        @Field("username") username: String,
+        @Field("password") password: String,
+        @Field("remember") remember: String = "on"
+    ): Response<LoginResponse>
+
+    @POST("api/login")
+    suspend fun loginJson(
+        @Body request: LoginRequest
+    ): Response<LoginResponse>
+
+    @GET("logout")
+    suspend fun logout(): Response<Unit>
+
+    @GET("api/load")
+    suspend fun loadPCs(): Response<PCListResponse>
+
+    @GET("api/status")
+    suspend fun checkPCStatus(@Query("ip") ip: String): Response<StatusResponse>
+
+    @POST("api/add")
+    suspend fun addPC(@Body request: AddPCRequest): Response<PCListResponse>
+
+    @GET("api/delete")
+    suspend fun deletePC(@Query("mac") mac: String): Response<PCListResponse>
+
+    @GET("api/wake")
+    suspend fun wakePC(@Query("mac") mac: String): Response<WakeResponse>
+
+    @POST("api/shutdown")
+    suspend fun shutdownPC(@Body request: ShutdownRequest): Response<ShutdownResponse>
+
+    @GET("api/get_encryption_key")
+    suspend fun getEncryptionKey(): Response<EncryptionKeyResponse>
+
+    companion object {
+        // Persistent cookie jar instance
+        private var persistentCookieJar: PersistentCookieJar? = null
+
+        private fun getCookieJar(context: Context): PersistentCookieJar {
+            if (persistentCookieJar == null) {
+                persistentCookieJar = PersistentCookieJar(context.applicationContext)
+            }
+            return persistentCookieJar!!
+        }
+
+        fun create(context: Context): ApiService {
+            val preferenceManager = PreferenceManager(context)
+
+            // Logging interceptor disabled to prevent stream issues
+            // val logging = HttpLoggingInterceptor()
+            // logging.setLevel(HttpLoggingInterceptor.Level.HEADERS)
+
+            // Add interceptor to set proper headers for API requests
+            val headerInterceptor = okhttp3.Interceptor { chain ->
+                val original = chain.request()
+                val request = original.newBuilder()
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .build()
+                chain.proceed(request)
+            }
+
+            val client = OkHttpClient.Builder()
+                .cookieJar(getCookieJar(context))
+                // .addInterceptor(logging)  // Disabled to prevent stream issues
+                .addInterceptor(headerInterceptor)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)  // Shorter read timeout
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(false)  // Disable retry to prevent connection conflicts
+                .build()
+
+            val retrofit = Retrofit.Builder()
+                .baseUrl(preferenceManager.serverUrl.let {
+                    if (it.endsWith("/")) it else "$it/"
+                })
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+
+            return retrofit.create(ApiService::class.java)
+        }
+
+        fun createWithBaseUrl(baseUrl: String): ApiService {
+            // Logging interceptor disabled to prevent stream issues
+            // val logging = HttpLoggingInterceptor()
+            // logging.setLevel(HttpLoggingInterceptor.Level.HEADERS)
+
+            // Add interceptor to set proper headers for API requests
+            val headerInterceptor = okhttp3.Interceptor { chain ->
+                val original = chain.request()
+                val request = original.newBuilder()
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .build()
+                chain.proceed(request)
+            }
+
+            // Use existing cookie jar instance if available
+            val cookieJar = persistentCookieJar ?: CookieJar.NO_COOKIES
+
+            val client = OkHttpClient.Builder()
+                .cookieJar(cookieJar)
+                // .addInterceptor(logging)  // Disabled to prevent stream issues
+                .addInterceptor(headerInterceptor)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)  // Shorter read timeout
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(false)  // Disable retry to prevent connection conflicts
+                .build()
+
+            val retrofit = Retrofit.Builder()
+                .baseUrl(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+
+            return retrofit.create(ApiService::class.java)
+        }
+    }
+}
+
+data class LoginRequest(
+    val username: String,
+    val password: String,
+    val remember: Boolean = true
+)
+
+data class AddPCRequest(
+    val mac: String,
+    val hostname: String
+)
+
+data class ShutdownRequest(
+    val pc_ip: String,
+    val username: String? = null,
+    val password: String? = null,
+    val encrypted_payload: String? = null
+)

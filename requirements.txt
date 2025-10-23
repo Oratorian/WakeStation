@@ -1,13 +1,19 @@
-# Core Flask application dependencies
+# Core Flask application dependencies (minimal - only for template rendering)
 Flask==3.0.3
-Flask-Login==0.6.3
 werkzeug==3.0.4
-gunicorn==23.0.0
+
+# FastAPI and ASGI server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+python-jose[cryptography]>=3.3.0  # JWT authentication
+python-multipart>=0.0.12
 
 # Security and authentication
 bcrypt==4.2.0
 cryptography==43.0.1
-
+passlib
+rsyslog-logger==1.0.5
 # HTTP client and utilities
 requests>=2.32.3
 python-dotenv>=1.0.1
