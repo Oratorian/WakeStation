@@ -25,19 +25,20 @@ server_thread = None
 sync_thread = None
 
 
-
 def background_sync_worker(
     wol_server_ip: str,
     wol_server_port: int,
     bind_port: int,
     bind_ip: str,
+    ssl_enabled: bool = True,
+    ssl_verify: bool = True,
     retry_interval: int = 300,  # 5 minutes
 ):
     """Background worker to periodically retry sync if it fails."""
     global server_running
 
     # Initial sync attempt
-    success = sync_encryption_key(wol_server_ip, wol_server_port, bind_port, bind_ip)
+    success = sync_encryption_key(wol_server_ip, wol_server_port, bind_port, bind_ip, ssl_enabled=ssl_enabled, ssl_verify=ssl_verify)
 
     # If initial sync failed, keep retrying periodically while server is running
     while server_running and not success:
@@ -51,7 +52,7 @@ def background_sync_worker(
 
         if server_running:
             success = sync_encryption_key(
-                wol_server_ip, wol_server_port, bind_port, bind_ip
+                wol_server_ip, wol_server_port, bind_port, bind_ip, ssl_enabled=ssl_enabled, ssl_verify=ssl_verify
             )
 
     if success:
@@ -68,6 +69,8 @@ def start_server(
     wol_server_port: int,
     dry_run: bool = False,
     dry_run_state: dict = None,
+    ssl_enabled: bool = True,
+    ssl_verify: bool = True,
 ):
     """Start the shutdown daemon server."""
     global server_running, sync_thread
@@ -75,6 +78,7 @@ def start_server(
 
     log.info(f"Starting shutdown daemon server on {bind_ip}:{bind_port}")
     log.info(f"Dry-run mode: {'enabled' if dry_run else 'disabled'}")
+    log.info(f"WakeStation connection: {'HTTPS' if ssl_enabled else 'HTTP'}, SSL verify: {ssl_verify}")
 
     # Create server socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -89,7 +93,7 @@ def start_server(
         # Start background sync worker to handle WakeStation connection with retries
         sync_thread = threading.Thread(
             target=background_sync_worker,
-            args=(wol_server_ip, wol_server_port, bind_port, bind_ip),
+            args=(wol_server_ip, wol_server_port, bind_port, bind_ip, ssl_enabled, ssl_verify),
             daemon=True,
         )
         sync_thread.start()
@@ -133,6 +137,8 @@ def start_server_thread(
     wol_server_port: int,
     dry_run: bool = False,
     dry_run_state: dict = None,
+    ssl_enabled: bool = True,
+    ssl_verify: bool = True,
 ):
     """Start server in a separate thread for GUI applications."""
     global server_thread
@@ -147,6 +153,8 @@ def start_server_thread(
             wol_server_port,
             dry_run,
             dry_run_state,
+            ssl_enabled,
+            ssl_verify,
         ),
         daemon=True,
     )

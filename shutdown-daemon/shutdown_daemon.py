@@ -56,12 +56,15 @@ def main():
     WOL_SERVER_PORT = (
         args.wol_server_port
         if args.wol_server_port is not None
-        else int(os.getenv("WOL_SERVER_PORT", "8888"))
+        else int(os.getenv("WOL_SERVER_PORT", "443"))
     )
     BIND_IP = args.bind_ip if args.bind_ip else os.getenv("BIND_IP", "0.0.0.0")
     BIND_PORT = (
         args.bind_port if args.bind_port else int(os.getenv("BIND_PORT", "8080"))
     )
+    # SSL settings: CLI args take precedence, then env vars, then defaults
+    SSL_ENABLED = args.ssl if args.ssl else (os.getenv("SSL_ENABLED", "true").lower() in ("true", "1", "yes"))
+    SSL_VERIFY = False if args.no_ssl_verify else (os.getenv("SSL_VERIFY", "true").lower() in ("true", "1", "yes"))
 
     log.info("WakeStation Shutdown Daemon starting...")
     log.info(
@@ -104,7 +107,7 @@ def main():
                 WOL_SERVER_PORT = (
                     args.wol_server_port
                     if args.wol_server_port is not None
-                    else int(os.getenv("WOL_SERVER_PORT", "8888"))
+                    else int(os.getenv("WOL_SERVER_PORT", "443"))
                 )
                 BIND_IP = (
                     args.bind_ip if args.bind_ip else os.getenv("BIND_IP", "0.0.0.0")
@@ -114,6 +117,9 @@ def main():
                     if args.bind_port
                     else int(os.getenv("BIND_PORT", "8080"))
                 )
+                # SSL settings: CLI args take precedence, then env vars, then defaults
+                SSL_ENABLED = args.ssl if args.ssl else (os.getenv("SSL_ENABLED", "true").lower() in ("true", "1", "yes"))
+                SSL_VERIFY = False if args.no_ssl_verify else (os.getenv("SSL_VERIFY", "true").lower() in ("true", "1", "yes"))
 
                 log.info(
                     "Configuration completed successfully, proceeding with server startup"
@@ -154,6 +160,8 @@ def main():
                     WOL_SERVER_PORT,
                     dry_run_state["enabled"],
                     dry_run_state,
+                    SSL_ENABLED,
+                    SSL_VERIFY,
                 )
 
                 # Run tray (blocks until quit)
@@ -176,6 +184,8 @@ def main():
                 WOL_SERVER_PORT,
                 dry_run_state["enabled"],
                 dry_run_state,
+                SSL_ENABLED,
+                SSL_VERIFY,
             )
         except KeyboardInterrupt:
             log.info("Shutdown daemon stopped.")

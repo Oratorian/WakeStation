@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WakeStation Cyberpunk Theme - Matching Web UI -->
+
+    <!-- Background Colors -->
+    <color name="bg_primary">#0a0e1a</color>
+    <color name="bg_secondary">#1a1f2e</color>
+    <color name="bg_tertiary">#242938</color>
+
+    <!-- Accent Colors -->
+    <color name="accent_primary">#00ff88</color>
+    <color name="accent_secondary">#0099ff</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#e6e8eb</color>
+    <color name="text_secondary">#9ca3af</color>
+    <color name="text_muted">#6b7280</color>
+
+    <!-- Border and UI Colors -->
+    <color name="border_color">#374151</color>
+    <color name="danger">#ef4444</color>
+    <color name="warning">#f59e0b</color>
+    <color name="success">#10b981</color>
+
+    <!-- Status colors -->
+    <color name="status_online">#10b981</color>
+    <color name="status_offline">#ef4444</color>
+    <color name="status_unknown">#6b7280</color>
+
+    <!-- Legacy colors for compatibility -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

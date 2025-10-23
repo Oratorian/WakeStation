@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![WakeStation](https://img.shields.io/badge/WakeStation-v2.9.3-00ff88?style=for-the-badge&logo=wifi&logoColor=white)
+![WakeStation](https://img.shields.io/badge/WakeStation-v3.0.0-00ff88?style=for-the-badge&logo=wifi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-0099ff?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge&logo=gnu&logoColor=white)
 ![Build Status](https://img.shields.io/github/actions/workflow/status/Oratorian/WakeStation/release.yml?style=for-the-badge&logo=github&logoColor=white&label=Build)
@@ -18,6 +18,7 @@
 ## 📋 Table of Contents
 
 - [✨ Features](#-features)
+- [🆕 What's New in v3.0.0](#-whats-new-in-v300)
 - [⚙️ Requirements](#️-requirements)
 - [🚀 Installation Guide](#-installation-guide)
   - [📦 Install arp-scan](#-1-install-arp-scan-linux-only)
@@ -26,7 +27,9 @@
   - [🔧 Install Dependencies](#-4-install-dependencies)
   - [🔧 Configuration](#-5-configuration)
 - [🖥️ WakeStation Server Setup](#️-wakestation-server-setup)
+- [🔒 SSL/TLS Configuration](#-ssltls-configuration)
 - [💻 Shutdown Daemon Setup](#-shutdown-daemon-setup)
+- [📱 Android App](#-android-app)
 - [🔧 Command Line Usage](#-command-line-usage)
 - [🔨 Building Binaries](#-building-binaries)
 - [🌐 API Documentation](#-api-documentation)
@@ -37,14 +40,63 @@
 ## ✨ Features
 
 - **Wake-on-LAN Support**: Trigger WOL requests for devices in your network using their MAC addresses.
-- **Remote Shutdown Support**: Includes Python-based shutdown daemon for remote shutdown commands.
+- **Remote Shutdown Support**: Includes Python-based shutdown daemon for remote shutdown commands with end-to-end encryption.
+- **JWT Authentication**: Secure token-based authentication with automatic token refresh.
+- **SSL/TLS Support**: Native HTTPS support without reverse proxy (internal CA and Let's Encrypt).
+- **FastAPI + Flask**: Modern REST API with automatic OpenAPI documentation and interactive web UI.
+- **Android Application**: Native Android app with JWT authentication and biometric support.
 - **System Tray Integration**: Shutdown daemon runs with system tray icon, dry-run toggle, and status monitoring.
-- **User Authentication**: Secure access to the server using Flask-Login and bcrypt for password management.
-- **Web Interface**: Built-in web interface using Flask to send WOL and shutdown requests.
-- **REST API**: Direct API access with curl or other tools using session cookies for automation and scripting.
+- **GUID-Based Daemon Registry**: Network-agnostic daemon identification and discovery.
+- **REST API**: Direct API access with JWT tokens for automation and scripting.
 - **Database Integration**: Stores user and device information in a local JSON-based database.
-- **GUI User Setup**: Automatic GUI dialog for initial user configuration when users.json is missing.
-- **.env File Support**: Easily configure important variables for the server and shutdown daemon.
+- **Comprehensive Logging**: Separate access logs and application logs with rotation.
+
+---
+
+## 🆕 What's New in v3.0.0
+
+### Major Changes
+
+- **JWT-Only Authentication**: Removed Flask-Login/Flask-Session in favor of unified JWT authentication
+  - Access tokens (15 min expiry) and refresh tokens (7 day expiry)
+  - Tokens persist across server restarts
+  - Automatic token refresh mechanism
+
+- **SSL/TLS Support**: Native HTTPS without reverse proxy
+  - Support for internal CA certificates
+  - Let's Encrypt integration
+  - Configurable in `config.py`
+
+- **FastAPI Integration**: Hybrid FastAPI + Flask architecture
+  - FastAPI for REST API with automatic OpenAPI docs
+  - Flask for web UI rendering
+  - Interactive API documentation at `/docs` and `/redoc`
+
+- **GUID-Based Daemon Registry**: Network-agnostic daemon identification
+  - Daemons identified by GUID instead of IP
+  - Survives network changes and DHCP reassignments
+
+- **Android Application**: Native Android app included
+  - JWT authentication with secure token storage
+  - Biometric authentication for shutdown operations
+  - Material Design UI with proper system bar handling
+  - Network security config for internal CA support
+
+- **Code Cleanup**: Removed 700+ lines of redundant code
+  - Removed duplicate functions and obsolete Docker infrastructure
+  - Consolidated logging system with rsyslog-logger
+  - Reorganized UI structure to `src/ui/`
+
+- **Separate Access Logging**: HTTP access logs in dedicated file
+  - `logs/access.log` for HTTP requests
+  - `logs/wakestation.log` for application logs
+
+### Breaking Changes
+
+- **Authentication**: Cookie-based auth replaced with JWT tokens
+- **API Endpoints**: All endpoints now require `Authorization: Bearer <token>` header
+- **Port**: Default changed from 8889 to 443 (HTTPS)
+- **Daemon Registration**: Now requires GUID-based identification
 
 ---
 
@@ -143,41 +195,68 @@ This single requirements file contains all dependencies needed for both WakeStat
 
 ### 🔧 5. Configuration
 
+**Configure `config.py` for WakeStation server:**
+
+Key settings to configure:
+
+```python
+# Network Configuration
+WOL_SERVER_HOST = "10.0.1.13"  # Must be actual network IP (not 127.0.0.1)
+WOL_SERVER_PORT = 443           # Port 443 for HTTPS, 80 for HTTP
+
+# SSL/TLS Configuration
+ENABLE_SSL = True
+SSL_CERTFILE = "/path/to/fullchain.pem"
+SSL_KEYFILE = "/path/to/privkey.pem"
+SSL_CA_CERTS = None  # Optional: Internal CA certificate
+
+# Security Configuration
+SECRET_KEY = "your-secret-key-here"
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+```
+
 **Configure the `.env` file for the shutdown daemon:**
-   - Create a `.env` file in the same directory as the `shutdown_daemon.py` script.
-   - Add the following lines to configure the daemon:
-     ```plaintext
-     WOL_SERVER_IP = 127.0.0.1
-     WOL_SERVER_PORT = 8889
-     BIND_IP = 127.0.0.1
-     BIND_PORT = 8080
-     SECRET_KEY=<Your secret key for HMAC authentication>
-     ```
-   - Replace `<Your WakeStation IP>`, `<Your WakeStation port>`, and `<Your secret key>` with your specific configuration.
+
+Create a `.env` file in the `shutdown-daemon/` directory:
+
+```plaintext
+WOL_SERVER_IP = 10.0.1.13
+WOL_SERVER_PORT = 443
+BIND_IP = 0.0.0.0
+BIND_PORT = 8080
+SECRET_KEY = your-secret-key-here
+```
+
+Replace values with your specific configuration. The `SECRET_KEY` must match the one in `config.py`.
 
 ---
 
 ## 🖥️ WakeStation Server Setup
 
-If you want to run WakeStation as a systemd service, you'll need to:
+### Option A: Systemd Service (Recommended for Production)
 
-**A. Update wakestation.service paths:**
-The included `wakestation.service` file needs to be configured for your virtual environment:
+**1. Update wakestation.service paths:**
+
+Edit the service file to match your installation:
 
 ```bash
-# Edit the service file
 sudo nano wakestation.service
-
-# Update these paths in the service file:
-WorkingDirectory=/path/to/your/wakestation/directory
-ExecStart=/path/to/your/wakestation-venv/bin/gunicorn --workers 1 --bind 0.0.0.0:8889 wakestation:app
 ```
 
-**Important:** Replace `/usr/local/bin/gunicorn` with your virtual environment's gunicorn path:
-- If using venv: `/path/to/wakestation-venv/bin/gunicorn`
-- To find your venv path: `which gunicorn` (while venv is activated)
+Update these paths:
+```ini
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/wol
+ExecStart=/opt/wol/.wol/bin/python wakestation.py
 
-**B. Install and activate the systemd service:**
+# Capabilities for privileged port binding and arp-scan
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SETFCAP
+```
+
+**2. Install and activate the service:**
 
 ```bash
 # Copy the service file to systemd directory
@@ -195,33 +274,91 @@ sudo systemctl start wakestation
 # Check service status
 sudo systemctl status wakestation
 
-# View service logs if needed
+# View service logs
 sudo journalctl -u wakestation -f
 ```
 
-### 9. Run the WakeStation:
+### Option B: Manual Execution (Development/Testing)
 
-**Option A: Using systemd service (recommended for production):**
-If you completed step 8, the service is already running! Access it at `http://your-server-ip:8889`
-
-**Option B: Manual execution (for development/testing):**
-For temporary testing or development, you can run WakeStation manually:
+For temporary testing or development:
 
 ```bash
-# Using tmux (recommended for persistent sessions)
-tmux new-session -d -s wakestation
-tmux send-keys -t wakestation "source venv/bin/activate" Enter
-tmux send-keys -t wakestation "gunicorn --bind 0.0.0.0:8889 wakestation:app" Enter
+# Activate virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Using screen (alternative)
-screen -dmS wakestation bash -c 'source venv/bin/activate && gunicorn --bind 0.0.0.0:8889 wakestation:app'
-
-# Direct execution (will stop when terminal closes)
-source venv/bin/activate
-gunicorn --bind 0.0.0.0:8889 wakestation:app
+# Run WakeStation
+python wakestation.py
 ```
 
-**Note:** Replace `8889` with `5000` if you prefer port 5000, but remember to update firewall rules accordingly.
+**Using tmux for persistent sessions:**
+```bash
+tmux new-session -d -s wakestation
+tmux send-keys -t wakestation "source venv/bin/activate" Enter
+tmux send-keys -t wakestation "python wakestation.py" Enter
+```
+
+### 🌐 Access WakeStation
+
+- **HTTPS**: `https://your-server-ip` (default port 443)
+- **HTTP**: `http://your-server-ip:8889` (if SSL disabled)
+- **API Docs**: `https://your-server-ip/docs` (Swagger UI)
+- **ReDoc**: `https://your-server-ip/redoc` (Alternative API docs)
+
+---
+
+## 🔒 SSL/TLS Configuration
+
+WakeStation v3.0.0+ supports native HTTPS without requiring a reverse proxy.
+
+### Self-Signed Certificate (Testing)
+
+Generate a self-signed certificate for testing:
+
+```bash
+bash generate_ssl_cert.sh
+```
+
+This creates:
+- `ssl/cert.pem` - Self-signed certificate
+- `ssl/key.pem` - Private key
+
+### Internal CA Certificate
+
+For internal networks with a custom CA:
+
+```bash
+# Generate certificate request
+openssl req -new -newkey rsa:4096 -nodes \
+  -keyout key.pem -out csr.pem \
+  -subj "/CN=wakestation.yourdomain.local"
+
+# Sign with your internal CA
+# (varies by CA setup)
+
+# Update config.py
+SSL_CERTFILE = "/path/to/fullchain.crt"
+SSL_KEYFILE = "/path/to/key.pem"
+SSL_CA_CERTS = None
+```
+
+### Let's Encrypt (Production)
+
+For public-facing servers:
+
+```bash
+# Install certbot
+sudo apt install certbot  # Ubuntu/Debian
+
+# Obtain certificate
+sudo certbot certonly --standalone -d wakestation.yourdomain.com
+
+# Update config.py
+SSL_CERTFILE = "/etc/letsencrypt/live/wakestation.yourdomain.com/fullchain.pem"
+SSL_KEYFILE = "/etc/letsencrypt/live/wakestation.yourdomain.com/privkey.pem"
+SSL_CA_CERTS = None
+```
+
+See [SSL_SETUP.md](SSL_SETUP.md) for detailed SSL configuration guide.
 
 ---
 
@@ -229,7 +366,7 @@ gunicorn --bind 0.0.0.0:8889 wakestation:app
 
 The shutdown daemon must be installed on each computer you want to remotely shutdown. Choose the appropriate method for your operating system:
 
-## **Linux Systems:**
+### Linux Systems:
 
 **Option A: Systemd Service (recommended for all Linux systems):**
 
@@ -240,8 +377,8 @@ Configure and install the shutdown daemon as a system service:
 sudo nano shutdown-daemon/shutdown_daemon.service
 
 # Update these paths in the service file:
-WorkingDirectory=/path/to/your/wakestation/shutdown-daemon
-ExecStart=/path/to/your/shutdown-daemon-venv/bin/python shutdown_daemon.py
+WorkingDirectory=/opt/wol/shutdown-daemon
+ExecStart=/opt/wol/.wol/bin/python shutdown_daemon.py
 
 # Copy service file to systemd directory
 sudo cp shutdown-daemon/shutdown_daemon.service /etc/systemd/system/
@@ -282,21 +419,20 @@ cd shutdown-daemon
 python shutdown_daemon.py
 ```
 
-## **Windows Systems:**
+### Windows Systems:
 
 **Option A: GUI Mode (desktop/workstation):**
 - Download precompiled binaries from releases
-- Double-click `shutdown_daemon-v2.7.1-x64.exe` to run with system tray
+- Double-click `shutdown_daemon-gui.exe` to run with system tray
 - System tray provides:
   - Dry-run mode toggle (orange icon = dry-run, red icon = normal)
   - Last request status display
   - Restart daemon and quit options
-  - Automatic GUI setup dialog if users.json is missing
 
 **Option B: CLI Mode (servers/command line):**
 ```cmd
 # Run from command prompt
-shutdown_daemon-v2.7.1-x64-cli.exe
+shutdown_daemon-cli.exe
 
 # Or using Python directly
 python shutdown-daemon/shutdown_daemon.py
@@ -309,17 +445,66 @@ For remote shutdowns to work on systems **without auto-login**, the daemon must 
 ```cmd
 # Install NSSM: Download from https://nssm.cc/
 # Install daemon as service (use CLI version for services):
-nssm install WakeStationDaemon "C:\path\to\shutdown_daemon-v2.7.1-x64-cli.exe"
+nssm install WakeStationDaemon "C:\path\to\shutdown_daemon-cli.exe"
 nssm set WakeStationDaemon Description "WakeStation Remote Shutdown Daemon"
 nssm start WakeStationDaemon
 ```
 
 **Alternative for auto-login systems:** Add the GUI version to startup via Startup folder or Task Scheduler.
 
-### 🌐 Access WakeStation
-```
-http://localhost:8889
-```
+---
+
+## 📱 Android App
+
+WakeStation v3.0.0 includes a native Android application located in `android-app/`.
+
+### Features
+
+- **JWT Authentication**: Secure token-based login with automatic refresh
+- **Biometric Authentication**: Optional biometric auth for shutdown operations
+- **Secure Credential Storage**: Encrypted storage using Android Keystore
+- **Material Design**: Modern UI following Material Design 3 guidelines
+- **Network Security**: Supports internal CA certificates for HTTPS
+
+### Building the Android App
+
+1. **Open in Android Studio**:
+   ```bash
+   # Open the android-app directory in Android Studio
+   ```
+
+2. **Configure Server URL**:
+   Edit `android-app/src/main/java/com/wakestation/android/network/VolleyApiService.kt`:
+   ```kotlin
+   private val BASE_URL = "https://wakestation.yourdomain.com"
+   ```
+
+3. **Build APK**:
+   - Build → Build Bundle(s) / APK(s) → Build APK(s)
+   - APK will be in `android-app/build/outputs/apk/`
+
+### Installing on Android Device
+
+1. **Install CA Certificate** (if using internal CA):
+   - Settings → Security → Install from storage
+   - Select your CA certificate file
+   - Name it and set usage to "VPN and apps"
+
+2. **Install APK**:
+   - Transfer APK to device
+   - Enable "Install from unknown sources"
+   - Install the APK
+
+3. **Configure and Login**:
+   - Open WakeStation app
+   - Settings → Configure server URL (if not embedded)
+   - Login with your WakeStation credentials
+
+### Network Security Configuration
+
+The app includes network security configuration to trust user-installed CA certificates. This is required for Android 7+ devices using internal CAs.
+
+Location: `android-app/src/main/res/xml/network_security_config.xml`
 
 ---
 
@@ -333,24 +518,27 @@ If you prefer, you can configure the `shutdown_daemon` using command-line argume
 - `--bind-port`: Set the port to bind the daemon server.
 - `--dry-run`: Enable dry-run mode for testing without executing shutdown commands.
 
-# Examples:
-### Using Python
+### Examples:
+
+**Using Python:**
 ```bash
-python shutdown_daemon.py --wol-server-ip 127.0.0.1 --wol-server-port 8889 --secret-key your_secret_key --bind-ip 0.0.0.0 --bind-port 8080 --dry-run
-```
-### Using precompiled Windows binary (command-line version)
-```bash
-WakeStation-CLI.exe --wol-server-ip 127.0.0.1 --wol-server-port 8889 --secret-key your_secret_key --bind-ip 0.0.0.0 --bind-port 8080 --dry-run
-```
-### Show help (Windows binary)
-```bash
-WakeStation-CLI.exe --help
+python shutdown_daemon.py --wol-server-ip 10.0.1.13 --wol-server-port 443 --secret-key your_secret_key --bind-ip 0.0.0.0 --bind-port 8080 --dry-run
 ```
 
-## Using precompiled Windows binary (GUI version)
-##### For GUI mode, just run the executable (configure .env file first)
+**Using precompiled Windows binary (command-line version):**
 ```bash
-Just run WakeStation.exe
+shutdown_daemon-cli.exe --wol-server-ip 10.0.1.13 --wol-server-port 443 --secret-key your_secret_key --bind-ip 0.0.0.0 --bind-port 8080 --dry-run
+```
+
+**Show help (Windows binary):**
+```bash
+shutdown_daemon-cli.exe --help
+```
+
+**Using precompiled Windows binary (GUI version):**
+```bash
+# For GUI mode, just run the executable (configure .env file first)
+shutdown_daemon-gui.exe
 ```
 
 **Note**: The system tray dry-run toggle can override the `--dry-run` flag at runtime, providing convenient testing control without restarting the daemon.
@@ -368,6 +556,7 @@ The easiest way to build executables is using the included batch files:
 **Windows:**
 ```cmd
 # Build CLI version (for servers and Windows services)
+cd shutdown-daemon
 build_cli.bat
 
 # Build GUI version (for desktop systems with system tray)
@@ -388,8 +577,6 @@ build_gui.bat
 Built executables will be located in:
 - **`bin/Release/shutdown_daemon-cli.exe`** - CLI version for servers
 - **`bin/Release/shutdown_daemon-gui.exe`** - GUI version for desktop
-
-**Note:** Build files are created in `/bin/Release/` where the `build-<>.bat` scripts reside.
 
 ### 🐧 Linux Build Notes
 
@@ -428,88 +615,158 @@ pyinstaller shutdown_daemon_gui.spec
 **Missing modules error:**
 The spec files include all necessary hidden imports. If you encounter missing module errors, they will be logged in the debug output.
 
-**Build artifacts:**
-Build scripts automatically clean up temporary files and organize output in a professional `bin/Release/` structure.
-
 ---
 
 ## 🌐 API Documentation
 
-Once authenticated, you can use curl with saved cookies to interact with the API endpoints:
+WakeStation v3.0.0 uses **JWT token authentication** instead of cookies. All API requests require an `Authorization` header with a valid JWT token.
+
+### Interactive API Documentation
+
+- **Swagger UI**: `https://your-server/docs`
+- **ReDoc**: `https://your-server/redoc`
 
 ### Authentication
+
+**Login and obtain JWT tokens:**
 ```bash
-# Login and save cookies to file
-curl -c cookies.txt -X POST -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}' \
-  http://localhost:8889/login
+# Login to get access and refresh tokens
+curl -k -X POST "https://localhost/api/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin123"
+
+# Response:
+# {
+#   "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+#   "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+#   "token_type": "bearer"
+# }
+
+# Save the access_token for subsequent requests
+export TOKEN="eyJ0eXAiOiJKV1QiLCJhbGc..."
+```
+
+**Refresh access token (when expired):**
+```bash
+# Use refresh token to get a new access token
+curl -k -X POST "https://localhost/api/refresh" \
+  -H "Authorization: Bearer $REFRESH_TOKEN"
+
+# Response:
+# {
+#   "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc..."
+# }
 ```
 
 ### API Endpoints
 
+All endpoints require `Authorization: Bearer <access_token>` header.
+
 **Load PCs list:**
 ```bash
-curl -b cookies.txt "http://localhost:8889/api/load"
+curl -k -H "Authorization: Bearer $TOKEN" \
+  "https://localhost/api/load"
 ```
 
 **Wake a PC:**
 ```bash
-curl -b cookies.txt "http://localhost:8889/api/wake?pc_name=MyPC"
+curl -k -H "Authorization: Bearer $TOKEN" \
+  "https://localhost/api/wake?mac=AA:BB:CC:DD:EE:FF"
 ```
 
 **Add a new PC:**
 ```bash
-curl -b cookies.txt -X POST -H "Content-Type: application/json" \
-  -d '{"pc_name":"TestPC","ip":"192.168.1.100","mac":"AA:BB:CC:DD:EE:FF","hostname":"testpc"}' \
-  http://localhost:8889/api/add
+curl -k -X POST "https://localhost/api/add" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pc_name": "TestPC",
+    "ip": "192.168.1.100",
+    "mac": "AA:BB:CC:DD:EE:FF",
+    "hostname": "testpc"
+  }'
 ```
 
 **Delete a PC:**
 ```bash
-curl -b cookies.txt "http://localhost:8889/api/delete?pc_name=TestPC"
+curl -k -X DELETE "https://localhost/api/delete?mac=AA:BB:CC:DD:EE:FF" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-**Shutdown a PC:**
+**Shutdown a PC (encrypted):**
 ```bash
-curl -b cookies.txt -X POST -H "Content-Type: application/json" \
-  -d '{"pc_name":"TestPC"}' \
-  http://localhost:8889/api/shutdown
+curl -k -X POST "https://localhost/api/shutdown_encrypted" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mac": "AA:BB:CC:DD:EE:FF",
+    "username": "admin",
+    "password": "password123"
+  }'
+```
+
+**Get current user info:**
+```bash
+curl -k -H "Authorization: Bearer $TOKEN" \
+  "https://localhost/api/me"
 ```
 
 **Get users list (admin only):**
 ```bash
-curl -b cookies.txt "http://localhost:8889/api/users"
+curl -k -H "Authorization: Bearer $TOKEN" \
+  "https://localhost/api/users"
 ```
 
 **Change user password:**
 ```bash
-curl -b cookies.txt -X POST -H "Content-Type: application/json" \
-  -d '{"current_password":"oldpass","new_password":"newpass"}' \
-  http://localhost:8889/api/change_password
+curl -k -X POST "https://localhost/api/change_password" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_password": "oldpass",
+    "new_password": "newpass"
+  }'
 ```
 
 **Change user permissions (admin only):**
 ```bash
-curl -b cookies.txt -X POST -H "Content-Type: application/json" \
-  -d '{"username":"user1","permission":"admin"}' \
-  http://localhost:8889/api/change_permission
+curl -k -X POST "https://localhost/api/change_permission" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user1",
+    "permission": "admin"
+  }'
 ```
 
 **Delete user (admin only):**
 ```bash
-curl -b cookies.txt -X POST -H "Content-Type: application/json" \
-  -d '{"username":"user1"}' \
-  http://localhost:8889/api/delete_user
+curl -k -X POST "https://localhost/api/delete_user" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user1"
+  }'
 ```
 
 **Sync encryption key (admin only):**
 ```bash
-curl -b cookies.txt -X POST -H "Content-Type: application/json" \
-  -d '{"target_ip":"192.168.1.100","target_port":"8080"}' \
-  http://localhost:8889/api/sync_encryption_key
+curl -k -X POST "https://localhost/api/sync_encryption_key" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "guid": "daemon-guid-here",
+    "target_port": 8080
+  }'
 ```
 
-The `-c cookies.txt` flag saves cookies during login, and `-b cookies.txt` uses those saved cookies for subsequent API requests.
+**Get daemon registry (admin only):**
+```bash
+curl -k -H "Authorization: Bearer $TOKEN" \
+  "https://localhost/api/daemon_registry"
+```
+
+**Note:** The `-k` flag bypasses SSL certificate verification (useful for self-signed certificates). Remove it when using valid certificates.
 
 ---
 

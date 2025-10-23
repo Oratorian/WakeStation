@@ -1,0 +1,69 @@
+package com.wakestation.android.network
+
+import android.content.Context
+import android.content.SharedPreferences
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
+
+class PersistentCookieJar(context: Context) : CookieJar {
+
+    private val sharedPreferences: SharedPreferences =
+        context.getSharedPreferences("cookies", Context.MODE_PRIVATE)
+
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+        val editor = sharedPreferences.edit()
+
+        cookies.forEach { cookie ->
+            val key = "${url.host}_${cookie.name}"
+            val cookieString = "${cookie.value}|${cookie.expiresAt}|${cookie.path}|${cookie.domain}"
+            editor.putString(key, cookieString)
+        }
+
+        // Use commit() instead of apply() to ensure synchronous saving
+        editor.commit()
+    }
+
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        val cookies = mutableListOf<Cookie>()
+        val allCookies = sharedPreferences.all
+
+        allCookies.forEach { (key, value) ->
+            if (key.startsWith("${url.host}_") && value is String) {
+                try {
+                    val parts = value.split("|")
+                    if (parts.size >= 4) {
+                        val cookieName = key.substringAfter("${url.host}_")
+                        val cookieValue = parts[0]
+                        val expiresAt = parts[1].toLong()
+                        val path = parts[2]
+                        val domain = parts[3]
+
+                        if (expiresAt > System.currentTimeMillis()) {
+                            val cookie = Cookie.Builder()
+                                .name(cookieName)
+                                .value(cookieValue)
+                                .expiresAt(expiresAt)
+                                .path(path)
+                                .domain(domain)
+                                .build()
+                            cookies.add(cookie)
+                        } else {
+                            // Remove expired cookie
+                            sharedPreferences.edit().remove(key).apply()
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Remove malformed cookie
+                    sharedPreferences.edit().remove(key).apply()
+                }
+            }
+        }
+
+        return cookies
+    }
+
+    fun clearAll() {
+        sharedPreferences.edit().clear().apply()
+    }
+}

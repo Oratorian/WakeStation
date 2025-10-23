@@ -8,7 +8,8 @@
 ********************************************************************************
 """
 
-from .logger import get_daemon_logger, write_log
+from ..logger_config import get_daemon_logger
+from .logger import write_log  # Keep for backward compatibility
 from .process import (
     check_if_daemon_running,
     create_pid_file,

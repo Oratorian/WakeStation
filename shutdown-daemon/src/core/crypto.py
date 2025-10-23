@@ -22,13 +22,70 @@ from typing import Optional
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
-from ..config import APP_DATA_PATH
+from ..config import APP_DATA_PATH, DAEMON_GUID_FILE
 from ..utils import get_daemon_logger, get_local_ip
 
 log = get_daemon_logger("crypto")
 
 # File path for encryption key
 ENCRYPTION_KEY_FILE = os.path.join(APP_DATA_PATH, "encryption.key")
+
+
+def get_or_create_daemon_guid() -> str:
+    """
+    Get existing daemon GUID or create a new one.
+    The GUID persists across daemon restarts and identifies this daemon uniquely.
+
+    Returns:
+        str: The daemon GUID (UUID4 format)
+    """
+    try:
+        # Try to load existing GUID
+        if os.path.exists(DAEMON_GUID_FILE):
+            with open(DAEMON_GUID_FILE, "r") as f:
+                guid = f.read().strip()
+                if guid and len(guid) == 36:  # Valid UUID4 length
+                    log.debug(f"Loaded existing daemon GUID: {guid}")
+                    return guid
+                else:
+                    log.warning(f"Invalid GUID in file, generating new one")
+
+        # Generate new GUID
+        new_guid = str(uuid.uuid4())
+
+        # Save to file
+        with open(DAEMON_GUID_FILE, "w") as f:
+            f.write(new_guid)
+
+        log.info(f"Generated new daemon GUID: {new_guid}")
+        return new_guid
+
+    except Exception as e:
+        log.error(f"Error managing daemon GUID: {e}")
+        # Return a temporary GUID based on MAC address as fallback
+        fallback_guid = str(
+            uuid.uuid5(uuid.NAMESPACE_DNS, get_mac_address() or "unknown")
+        )
+        log.warning(f"Using fallback GUID: {fallback_guid}")
+        return fallback_guid
+
+
+def get_daemon_hostname() -> str:
+    """
+    Get the hostname of this machine.
+
+    Returns:
+        str: The hostname of this daemon
+    """
+    try:
+        import socket
+
+        hostname = socket.gethostname()
+        log.debug(f"Detected hostname: {hostname}")
+        return hostname
+    except Exception as e:
+        log.error(f"Error getting hostname: {e}")
+        return "unknown-host"
 
 
 def get_mac_address(bind_ip: str = None) -> Optional[str]:
@@ -63,7 +120,7 @@ def get_mac_address(bind_ip: str = None) -> Optional[str]:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW if system == "windows" else 0
+                creationflags=subprocess.CREATE_NO_WINDOW if system == "windows" else 0,
             )
             if result.returncode == 0 and result.stdout.strip():
                 mac_raw = result.stdout.strip()
@@ -114,7 +171,7 @@ def get_mac_address(bind_ip: str = None) -> Optional[str]:
 
             # Fall back to ip command if PowerShell not available
             try:
-                if bind_ip and bind_ip != "0.0.0.0":
+                if bind_ip and bind_ip != "0.0.0.0" and bind_ip != "127.0.0.1":
                     # Find interface name for specific IP, then get its MAC
                     ip_result = subprocess.run(
                         ["ip", "addr", "show"],
@@ -209,8 +266,14 @@ def sync_encryption_key(
     bind_ip: str = None,
     max_retries: int = 5,
     initial_delay: float = 1.0,
+    ssl_enabled: bool = True,
+    ssl_verify: bool = True,
 ) -> bool:
-    """Sync encryption key with WakeStation server and register daemon IP with retry logic."""
+    """Sync encryption key with WakeStation server and register daemon with GUID-based identification."""
+    # Get or create persistent GUID for this daemon
+    daemon_guid = get_or_create_daemon_guid()
+    daemon_hostname = get_daemon_hostname()
+
     # Use provided bind IP or auto-detect local IP
     if bind_ip and bind_ip != "0.0.0.0":
         daemon_ip = bind_ip
@@ -245,21 +308,36 @@ def sync_encryption_key(
         "Content-Type": "application/json",
     }
 
+    # New GUID-based registration payload
     json_body = {
-        "daemon_ip": daemon_ip,
+        "daemon_guid": daemon_guid,
+        "hostname": daemon_hostname,
         "daemon_port": daemon_port,
-        "daemon_mac": daemon_mac,
+        # Include IP and MAC for backward compatibility and connection info
+        "connection_info": {
+            "ip": daemon_ip,
+            "port": daemon_port,
+            "mac": daemon_mac,
+        },
     }
 
-    wol_url = f"http://{wol_server_ip}:{wol_server_port}/api/sync_encryption_key"
+    # Build URL with protocol based on SSL setting
+    protocol = "https" if ssl_enabled else "http"
+    wol_url = f"{protocol}://{wol_server_ip}:{wol_server_port}/api/sync_encryption_key"
+
+    # Disable SSL warnings if verification is disabled
+    if ssl_enabled and not ssl_verify:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     # Retry logic with exponential backoff
     for attempt in range(max_retries):
         try:
             if attempt == 0:
                 log.info(
-                    f"Registering daemon at {daemon_ip}:{daemon_port} with WakeStation server"
+                    f"Registering daemon '{daemon_hostname}' (GUID: {daemon_guid[:8]}...) with WakeStation server"
                 )
+                log.debug(f"Connection: {protocol.upper()} to {wol_server_ip}:{wol_server_port}, SSL verify: {ssl_verify}")
             else:
                 delay = initial_delay * (2 ** (attempt - 1))
                 log.info(
@@ -267,10 +345,11 @@ def sync_encryption_key(
                 )
                 time.sleep(delay)
 
-            # Make request to WakeStation server with timeout
+            # Make request to WakeStation server with timeout and SSL settings
             response = requests.post(
                 wol_url,
                 headers=headers,
+                verify=ssl_verify if ssl_enabled else True,
                 json=json_body,
                 timeout=10,  # 10 second timeout
             )

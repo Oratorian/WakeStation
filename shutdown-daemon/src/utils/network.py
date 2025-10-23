@@ -34,7 +34,9 @@ def get_local_ip(target_ip: str = "8.8.8.8", target_port: int = 80) -> str:
             log.debug(f"Local IP for route to {target_ip}:{target_port} is {local_ip}")
             return local_ip
     except Exception as e:
-        log.warning(f"Could not determine local IP address for {target_ip}:{target_port}: {e}")
+        log.warning(
+            f"Could not determine local IP address for {target_ip}:{target_port}: {e}"
+        )
         # Fallback to Google DNS method
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:

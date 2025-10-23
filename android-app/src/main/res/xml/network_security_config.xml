@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Trust both system and user-installed certificates -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system (pre-installed) certificates -->
+            <certificates src="system" />
+            <!-- Trust user-installed certificates (required for internal CA) -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Optional: For development/testing with specific domain -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">wakestation.andrew.home</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

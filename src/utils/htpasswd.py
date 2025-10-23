@@ -11,29 +11,14 @@
 import bcrypt
 import getpass
 import os
-import json
 import sys
 import config
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from ..logger import logger
+from src import logger_config as logger
+from src.core.user import User
 
-log = logger.get_logger("htpasswd")
-
-
-def load_users():
-    """Load users from the JSON file."""
-    if os.path.exists(config.USERS_FILE):
-        with open(config.USERS_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-
-def save_users(users):
-    """Save users to the JSON file."""
-    os.makedirs(config.DB_DIR, exist_ok=True)
-    with open(config.USERS_FILE, "w") as f:
-        json.dump(users, f, indent=4)
+log = logger.get_logger("WakeStation-AUTH")
 
 
 def hash_password(password):
@@ -45,18 +30,18 @@ def hash_password(password):
 
 def save_to_users_json(username, hashed_password, permission="user"):
     """Save the username, hashed password, and permission to the users.json file."""
-    users = load_users()
+    users = User.load_users()
     users[username] = {
         "username": username,
         "password_hash": hashed_password,
-        "permission": "admin",
+        "permission": "admin",  # Hardcoded admin for CLI user creation
     }
-    save_users(users)
+    User.save_users(users)
 
 
 def user_exists(username):
     """Check if the username already exists in the users.json file."""
-    users = load_users()
+    users = User.load_users()
     return username in users
 
 

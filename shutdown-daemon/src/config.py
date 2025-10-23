@@ -17,15 +17,19 @@ load_dotenv()
 
 # Default configuration values
 DEFAULT_WOL_SERVER_IP = os.getenv("WOL_SERVER_IP", "")
-DEFAULT_WOL_SERVER_PORT = os.getenv("WOL_SERVER_PORT", "8889")
+DEFAULT_WOL_SERVER_PORT = os.getenv("WOL_SERVER_PORT", "443")
+DEFAULT_SSL_ENABLED = os.getenv("SSL_ENABLED", "true").lower() in ("true", "1", "yes")
+DEFAULT_SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() in ("true", "1", "yes")
 DEFAULT_BIND_IP = os.getenv("BIND_IP", "0.0.0.0")
 DEFAULT_BIND_PORT = int(os.getenv("BIND_PORT", 8080))
 
 # File paths
 APP_DATA_PATH = os.path.join(os.path.expanduser("~"), ".wakestation")
+LOG_DIR = APP_DATA_PATH  # Logs go in the same directory for now
 USERS_FILE_PATH = os.path.join(APP_DATA_PATH, "users.json")
-LOG_FILE_PATH = os.path.join(APP_DATA_PATH, "daemon.log")
+LOG_FILE_PATH = os.path.join(LOG_DIR, "daemon.log")
 PID_FILE = os.path.join(APP_DATA_PATH, "daemon.pid")
+DAEMON_GUID_FILE = os.path.join(APP_DATA_PATH, "daemon_guid.txt")
 
 # Ensure directories exist
 os.makedirs(APP_DATA_PATH, exist_ok=True)
@@ -82,6 +86,17 @@ System Tray:
         default=DEFAULT_BIND_PORT,
         metavar="PORT",
         help="Port to bind the shutdown daemon server (default: %(default)s or BIND_PORT env var)",
+    )
+    parser.add_argument(
+        "--ssl",
+        action="store_true",
+        default=DEFAULT_SSL_ENABLED,
+        help="Enable SSL/HTTPS for WakeStation server connection (default: %(default)s or SSL_ENABLED env var)",
+    )
+    parser.add_argument(
+        "--no-ssl-verify",
+        action="store_true",
+        help="Disable SSL certificate verification (useful for self-signed certificates)",
     )
     parser.add_argument(
         "--dry-run",

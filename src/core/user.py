@@ -11,8 +11,6 @@
 import os
 import json
 import bcrypt
-from flask_login import UserMixin
-import logging
 import base64
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -25,12 +23,14 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import config
-from ..logger import logger
+from src import logger_config as logger
 
-log = logger.get_logger("user")
+log = logger.get_logger("WakeStation-USER")
 
 
-class User(UserMixin):
+class User:
+    """User model for JWT-based authentication (no Flask-Login dependency)"""
+
     def __init__(self, id, username, password_hash, permission):
         self.id = id
         self.username = username
@@ -128,8 +128,8 @@ class User(UserMixin):
         cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
 
-        # Pad the data to make it compatible with AES block size (16 bytes)
-        padder = padding.PKCS7(algorithms.AES.block_size).padder()
+        # Pad the data to make it compatible with AES block size (128 bits = 16 bytes)
+        padder = padding.PKCS7(128).padder()
         padded_data = padder.update(data.encode()) + padder.finalize()
 
         # Encrypt the padded data
@@ -140,6 +140,41 @@ class User(UserMixin):
 
         # Encode the combined IV and encrypted data to base64 for safe transmission
         return base64.b64encode(encrypted_message).decode("utf-8")
+
+    @staticmethod
+    def decrypt_data(encrypted_data, key):
+        """Decrypt AES-encrypted data that was encrypted with encrypt_data()"""
+        log.debug("Decrypting encrypted payload")
+
+        # Ensure the key length is appropriate for AES (16, 24, or 32 bytes)
+        if len(key) not in [16, 24, 32]:
+            log.error(f"Invalid key size: {len(key)} bytes (must be 16, 24, or 32)")
+            raise ValueError("Invalid key size: key must be 16, 24, or 32 bytes long")
+
+        try:
+            # Decode the base64-encoded encrypted message
+            encrypted_message = base64.b64decode(encrypted_data)
+
+            # Extract the IV (first 16 bytes) and the encrypted data (remainder)
+            iv = encrypted_message[:16]
+            encrypted_data_bytes = encrypted_message[16:]
+
+            # Create an AES cipher object with the given key and IV in CBC mode
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            decryptor = cipher.decryptor()
+
+            # Decrypt the data
+            padded_data = decryptor.update(encrypted_data_bytes) + decryptor.finalize()
+
+            # Remove padding
+            unpadder = padding.PKCS7(128).unpadder()
+            data = unpadder.update(padded_data) + unpadder.finalize()
+
+            log.debug("Decryption successful")
+            return data.decode("utf-8")
+        except Exception as e:
+            log.error(f"Decryption failed: {str(e)}")
+            raise ValueError(f"Decryption failed: {str(e)}")
 
     @staticmethod
     def get_user_pc_file(username):
